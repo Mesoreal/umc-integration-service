@@ -1,0 +1,69 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - test
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: mesoreal/umc-integration-service
+  INFRA_REPO: Mesoreal/mesoreal-k8s
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract branch name
+        id: extract_branch
+        run: echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        id: build_push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }}-${{ github.sha }}
+
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Generate token for K8s Repo
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.INFRA_APP_ID }}
+          private-key: ${{ secrets.INFRA_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: "mesoreal-k8s"
+
+      - name: Update K8s Manifests in Infra Repo
+        env:
+          APP_TOKEN: ${{ steps.generate_token.outputs.token }}
+          ENV_DIR: overlays/${{ steps.extract_branch.outputs.branch }}
+          NEW_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }}-${{ github.sha }}
+        run: |
+          git clone https://x-access-token:${APP_TOKEN}@github.com/${{ env.INFRA_REPO }}.git
+          cd mesoreal-k8s/apps/umc-integration-service/$ENV_DIR
+          kustomize edit set image ghcr.io/mesoreal/umc-integration-service=$NEW_IMAGE
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Deploy umc-integration-service to ${{ steps.extract_branch.outputs.branch }} (sha: ${{ github.sha }})"
+          git push

@@ -1,0 +1,66 @@
+spring:
+  application:
+    name: umc-integration-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/umc_db}
+    username: ${SPRING_DATASOURCE_USERNAME:umc_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:umc_password}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:umc_user}
+    password: ${SPRING_RABBITMQ_PASSWORD:umc_password}
+    # Shared default vhost with profile-service — isolation is by queue-name
+    # convention (profile.*, umc.*), not by RabbitMQ vhost.
+    virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+
+logging:
+  level:
+    root: INFO
+    ru.provless.umc: DEBUG
+
+# Shared secret authenticating inbound /internal/* requests (from profile-service).
+# Same mesh-wide key already used between auth-service and phone-auth.
+internal:
+  api-key: ${INTERNAL_API_KEY:dev-internal-api-key-change-me}
+
+profile-service:
+  base-url: ${PROFILE_SERVICE_URL:http://localhost:8080}
+  internal-api-key: ${INTERNAL_API_KEY:dev-internal-api-key-change-me}
+  connect-timeout-ms: 2000
+  read-timeout-ms: 15000
+
+yandex:
+  ocr:
+    api-key: ${YANDEX_OCR_API_KEY:}
+    folder-id: ${YANDEX_FOLDER_ID:}
+    poll-interval-ms: ${YANDEX_OCR_POLL_INTERVAL_MS:1000}
+    # Budget for submit + poll, kept under precheck.timeout-ms so profile-service's
+    # own timeout never fires first — see umc/document-verification-plan.md "Бюджет".
+    poll-deadline-ms: 27000
+    connect-timeout-ms: 2000
+    read-timeout-ms: 10000
+
+# amoCRM (Фаза 2+) — config wired up now, no client uses it yet.
+amocrm:
+  subdomain: ${AMOCRM_SUBDOMAIN:}
+  client-id: ${AMOCRM_CLIENT_ID:}
+  client-secret: ${AMOCRM_CLIENT_SECRET:}
+  refresh-token: ${AMOCRM_REFRESH_TOKEN:}
+  webhook-secret: ${AMOCRM_WEBHOOK_SECRET:}
+  pipeline-id: ${AMOCRM_PIPELINE_ID:}
+  stage-approved-id: ${AMOCRM_STAGE_APPROVED_ID:}
+  stage-rejected-id: ${AMOCRM_STAGE_REJECTED_ID:}
