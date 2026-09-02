@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface DocumentReviewRepository extends JpaRepository<DocumentReview, UUID> {
 
     Optional<DocumentReview> findByDocumentId(UUID documentId);
+
+    Optional<DocumentReview> findByAmocrmLeadId(Long amocrmLeadId);
 }

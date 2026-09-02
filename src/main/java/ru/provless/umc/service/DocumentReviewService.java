@@ -13,10 +13,8 @@ import ru.provless.umc.dto.PrecheckRequest;
 import ru.provless.umc.dto.PrecheckResponse;
 import ru.provless.umc.dto.PrecheckVerdict;
 import ru.provless.umc.entity.DocumentReview;
-import ru.provless.umc.entity.DocumentReviewAudit;
 import ru.provless.umc.entity.DocumentReviewAuditEventType;
 import ru.provless.umc.entity.DocumentReviewStatus;
-import ru.provless.umc.repository.DocumentReviewAuditRepository;
 import ru.provless.umc.repository.DocumentReviewRepository;
 
 import java.math.BigDecimal;
@@ -31,7 +29,7 @@ public class DocumentReviewService {
     private final OcrClient ocrClient;
     private final DocumentKeywordFilter keywordFilter;
     private final DocumentReviewRepository documentReviewRepository;
-    private final DocumentReviewAuditRepository auditRepository;
+    private final DocumentReviewAuditWriter auditWriter;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -50,13 +48,13 @@ public class DocumentReviewService {
         review.setStatus(filterResult.passed() ? DocumentReviewStatus.PENDING_MANAGER : DocumentReviewStatus.AUTO_REJECTED);
         documentReviewRepository.save(review);
 
-        writeAudit(review, DocumentReviewAuditEventType.OCR_COMPLETED, Map.of(
+        auditWriter.write(review, DocumentReviewAuditEventType.OCR_COMPLETED, Map.of(
                 "confidence", String.valueOf(review.getOcrConfidence()),
                 "matchedKeywords", filterResult.matchedKeywords()
         ));
 
         if (!filterResult.passed()) {
-            writeAudit(review, DocumentReviewAuditEventType.AUTO_REJECTED, Map.of("reason", "no_expected_keywords_found"));
+            auditWriter.write(review, DocumentReviewAuditEventType.AUTO_REJECTED, Map.of("reason", "no_expected_keywords_found"));
             log.info("Precheck REJECT: documentId={} documentType={}", request.getDocumentId(), request.getDocumentType());
             return PrecheckResponse.builder()
                     .verdict(PrecheckVerdict.REJECT)
@@ -100,14 +98,5 @@ public class DocumentReviewService {
             return ocrResult.confidence();
         }
         return filterResult.passed() ? BigDecimal.ONE : BigDecimal.ZERO;
-    }
-
-    private void writeAudit(DocumentReview review, DocumentReviewAuditEventType eventType, Map<String, Object> payload) {
-        DocumentReviewAudit audit = new DocumentReviewAudit();
-        audit.setDocumentReviewId(review.getId());
-        audit.setEventType(eventType);
-        audit.setPayload(payload);
-        audit.setActor("system");
-        auditRepository.save(audit);
     }
 }

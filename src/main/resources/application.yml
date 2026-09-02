@@ -59,18 +59,22 @@ yandex:
 umc:
   public-base-url: ${UMC_PUBLIC_BASE_URL:http://localhost:8091}
 
-# amoCRM (Фаза 2: создание сделки, без вебхука — stage-approved/rejected-id и
-# webhook-secret понадобятся только в Фазе 3).
+# amoCRM (Фаза 2: создание сделки; Фаза 3: приём вебхука о смене этапа).
 amocrm:
   subdomain: ${AMOCRM_SUBDOMAIN:}
   client-id: ${AMOCRM_CLIENT_ID:}
   client-secret: ${AMOCRM_CLIENT_SECRET:}
   refresh-token: ${AMOCRM_REFRESH_TOKEN:}
   redirect-uri: ${AMOCRM_REDIRECT_URI:}
-  webhook-secret: ${AMOCRM_WEBHOOK_SECRET:}
   pipeline-id: ${AMOCRM_PIPELINE_ID:}
   stage-approved-id: ${AMOCRM_STAGE_APPROVED_ID:}
   stage-rejected-id: ${AMOCRM_STAGE_REJECTED_ID:}
+  # Secret embedded in the webhook callback URL path itself (POST /webhooks/amocrm/documents/{secret}),
+  # not a header — amoCRM's classic webhooks don't reliably sign their payload.
+  webhook-secret: ${AMOCRM_WEBHOOK_SECRET:}
+  # Optional extra layer, comma-separated. Empty = disabled (amoCRM doesn't publish a
+  # fixed egress IP list — fill this in once real traffic shows what to expect).
+  webhook-ip-allowlist: ${AMOCRM_WEBHOOK_IP_ALLOWLIST:}
   # Custom field IDs on the amoCRM lead — set in amoCRM's UI, then copied here (not
   # something we can invent from code). See umc/document-verification-plan.md "amoCRM".
   field-document-type-id: ${AMOCRM_FIELD_DOCUMENT_TYPE_ID:}
