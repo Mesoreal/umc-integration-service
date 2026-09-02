@@ -2,6 +2,7 @@ package ru.provless.umc.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.provless.umc.client.FileContent;
@@ -31,6 +32,7 @@ public class DocumentReviewService {
     private final DocumentKeywordFilter keywordFilter;
     private final DocumentReviewRepository documentReviewRepository;
     private final DocumentReviewAuditRepository auditRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public PrecheckResponse precheck(PrecheckRequest request) {
@@ -65,6 +67,10 @@ public class DocumentReviewService {
 
         log.info("Precheck PASS: documentId={} documentType={} matchedKeywords={}",
                 request.getDocumentId(), request.getDocumentType(), filterResult.matchedKeywords());
+        // Deferred to AFTER_COMMIT (see AmoCrmLeadListener) — the deal must not be created
+        // in amoCRM before this review row is durably saved, and amoCRM's latency must not
+        // block the HTTP response back to profile-service (stage 6 of the plan).
+        eventPublisher.publishEvent(new DocumentPassedPrecheckEvent(review.getId()));
         return PrecheckResponse.builder()
                 .verdict(PrecheckVerdict.PASS)
                 .reviewId(review.getId())
@@ -76,6 +82,7 @@ public class DocumentReviewService {
     private DocumentReview newReview(PrecheckRequest request) {
         DocumentReview review = new DocumentReview();
         review.setDocumentId(request.getDocumentId());
+        review.setFileId(request.getFileId());
         review.setProfileId(request.getProfileId());
         review.setUserId(request.getUserId());
         review.setDocumentType(request.getDocumentType());

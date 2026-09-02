@@ -1,5 +1,6 @@
 package ru.provless.umc.client;
 
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import ru.provless.umc.exception.ProfileContactFetchException;
 import ru.provless.umc.exception.ProfileFileFetchException;
 
 import java.time.Duration;
@@ -36,6 +38,7 @@ public class ProfileServiceClient {
     private int readTimeoutMs;
 
     private RestClient restClient;
+    private final JsonMapper jsonMapper = JsonMapper.builder().build();
 
     @PostConstruct
     void init() {
@@ -71,6 +74,21 @@ public class ProfileServiceClient {
             throw e;
         } catch (Exception e) {
             throw new ProfileFileFetchException("Failed to fetch fileId=" + fileId + " from profile-service", e);
+        }
+    }
+
+    /** Used to find/create the client's amoCRM contact (stage 6 — see the plan). */
+    public ContactInfo fetchContactInfo(UUID userId) {
+        try {
+            String responseBody = restClient.get()
+                    .uri("/internal/profiles/{userId}/contact-info", userId)
+                    .retrieve()
+                    .body(String.class);
+
+            var json = jsonMapper.readTree(responseBody);
+            return new ContactInfo(json.path("phone").asText(null), json.path("fullName").asText(null));
+        } catch (Exception e) {
+            throw new ProfileContactFetchException("Failed to fetch contact info for userId=" + userId + " from profile-service", e);
         }
     }
 }

@@ -26,6 +26,10 @@ public class DocumentReview {
     @Column(name = "document_id", nullable = false, unique = true)
     private UUID documentId;
 
+    /** Needed to re-fetch the file later (amoCRM link) — not in the original plan's data model. */
+    @Column(name = "file_id", nullable = false)
+    private UUID fileId;
+
     @Column(name = "profile_id", nullable = false)
     private UUID profileId;
 
@@ -57,6 +61,10 @@ public class DocumentReview {
 
     @Column(name = "amocrm_contact_id")
     private Long amocrmContactId;
+
+    /** Embedded in the file link shown in the amoCRM card — see FileAccessController. */
+    @Column(name = "file_access_token", nullable = false, unique = true)
+    private UUID fileAccessToken = UUID.randomUUID();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

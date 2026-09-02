@@ -22,8 +22,19 @@
 
 ## Взаимодействие с другими сервисами
 
-Слушает события profile-service (например, `profile.approved`) через шину
-(RabbitMQ, тот же паттерн, что auth-service → notification-service).
-Не пишет напрямую в таблицы profile-service — только через события/тонкий API.
+- `profile-service → umc-integration-service`: синхронный `POST /internal/document-review/precheck`.
+- `umc-integration-service → profile-service`: `GET /internal/storage/{userId}/{fileId}` (байты файла)
+  и `GET /internal/profiles/{userId}/contact-info` (телефон/имя — для контакта в amoCRM).
+  Оба защищены общим `X-Internal-Auth` (`INTERNAL_API_KEY`), как auth-service ↔ phone-auth.
+- `umc-integration-service → amoCRM`: API v4, OAuth2 (refresh-токен ротируется amoCRM
+  при каждом использовании — текущий хранится в БД, `AMOCRM_REFRESH_TOKEN` только
+  сеет первую запись).
+- `GET /files/document-review/{reviewId}/{token}` — единственный публичный роут
+  (не `/internal/**`): ссылка на файл в карточке amoCRM, аутентифицирована
+  непредсказуемым токеном в пути, не сессией.
+- RabbitMQ — общий дефолтный vhost `/` со всеми сервисами (не отдельный vhost),
+  изоляция по префиксу имени очереди (`umc.*`).
 
-Статус: заготовка, реализация не начата.
+Статус: Фаза 1 (precheck) и Фаза 2 (создание сделки в amoCRM, без вебхука) реализованы,
+не проверялись на реальном amoCRM/Yandex OCR аккаунте. Фаза 3 (вебхук) и Фаза 4
+(публикация статуса в profile-service) — не начаты.

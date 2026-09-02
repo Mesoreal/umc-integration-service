@@ -54,13 +54,28 @@ yandex:
     connect-timeout-ms: 2000
     read-timeout-ms: 10000
 
-# amoCRM (Фаза 2+) — config wired up now, no client uses it yet.
+# Public URL other systems (amoCRM, a manager's browser) use to reach this service —
+# unlike PROFILE_SERVICE_URL, this can't be the internal cluster DNS name.
+umc:
+  public-base-url: ${UMC_PUBLIC_BASE_URL:http://localhost:8091}
+
+# amoCRM (Фаза 2: создание сделки, без вебхука — stage-approved/rejected-id и
+# webhook-secret понадобятся только в Фазе 3).
 amocrm:
   subdomain: ${AMOCRM_SUBDOMAIN:}
   client-id: ${AMOCRM_CLIENT_ID:}
   client-secret: ${AMOCRM_CLIENT_SECRET:}
   refresh-token: ${AMOCRM_REFRESH_TOKEN:}
+  redirect-uri: ${AMOCRM_REDIRECT_URI:}
   webhook-secret: ${AMOCRM_WEBHOOK_SECRET:}
   pipeline-id: ${AMOCRM_PIPELINE_ID:}
   stage-approved-id: ${AMOCRM_STAGE_APPROVED_ID:}
   stage-rejected-id: ${AMOCRM_STAGE_REJECTED_ID:}
+  # Custom field IDs on the amoCRM lead — set in amoCRM's UI, then copied here (not
+  # something we can invent from code). See umc/document-verification-plan.md "amoCRM".
+  field-document-type-id: ${AMOCRM_FIELD_DOCUMENT_TYPE_ID:}
+  field-document-id-id: ${AMOCRM_FIELD_DOCUMENT_ID_ID:}
+  field-file-link-id: ${AMOCRM_FIELD_FILE_LINK_ID:}
+  field-ocr-confidence-id: ${AMOCRM_FIELD_OCR_CONFIDENCE_ID:}
+  connect-timeout-ms: 2000
+  read-timeout-ms: 10000
