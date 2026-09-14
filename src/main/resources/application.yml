@@ -45,6 +45,9 @@ profile-service:
 
 yandex:
   ocr:
+    # Секреты — из mesoreal-secrets. Folder ID тоже сюда: по факту это идентификатор
+    # каталога, привязанного к конкретному Yandex Cloud аккаунту/биллингу — считаем
+    # его чувствительным наравне с api-key, а не публичной настройкой.
     api-key: ${YANDEX_OCR_API_KEY:}
     folder-id: ${YANDEX_FOLDER_ID:}
     poll-interval-ms: ${YANDEX_OCR_POLL_INTERVAL_MS:1000}
@@ -60,26 +63,35 @@ umc:
   public-base-url: ${UMC_PUBLIC_BASE_URL:http://localhost:8091}
 
 # amoCRM (Фаза 2: создание сделки; Фаза 3: приём вебхука о смене этапа).
+#
+# Ниже — не учётные данные, а настройки конкретного амоCRM-аккаунта (поддомен, id
+# воронки/этапов/полей). Один аккаунт на весь бизнес, значения не различаются между
+# test/prod — поэтому заданы прямо здесь, а не через k8s Secret. Проставляются один
+# раз после настройки воронки «Проверка документов» в интерфейсе amoCRM,
+# см. umc/document-verification-plan.md "amoCRM". До этого момента — пустые, вебхук/лиды
+# создаваться не будут (клиенты AmoCrmClient должны считать это "не настроено").
 amocrm:
-  subdomain: ${AMOCRM_SUBDOMAIN:}
-  client-id: ${AMOCRM_CLIENT_ID:}
+  subdomain: ""
+  # OAuth client id — публичный идентификатор интеграции, не секрет (в отличие от
+  # client-secret ниже). Выдаётся amoCRM при регистрации интеграции.
+  client-id: ""
+  redirect-uri: ""
+  pipeline-id: ""
+  stage-approved-id: ""
+  stage-rejected-id: ""
+  # Comma-separated allowlist. Пусто = выключено (amoCRM не публикует фиксированный
+  # список исходящих IP — заполним, когда увидим реальный трафик от вебхука).
+  webhook-ip-allowlist: ""
+  field-document-type-id: ""
+  field-document-id-id: ""
+  field-file-link-id: ""
+  field-ocr-confidence-id: ""
+  connect-timeout-ms: 2000
+  read-timeout-ms: 10000
+
+  # Настоящие секреты — только из mesoreal-secrets (k8s Secret), никогда не хардкодим.
   client-secret: ${AMOCRM_CLIENT_SECRET:}
   refresh-token: ${AMOCRM_REFRESH_TOKEN:}
-  redirect-uri: ${AMOCRM_REDIRECT_URI:}
-  pipeline-id: ${AMOCRM_PIPELINE_ID:}
-  stage-approved-id: ${AMOCRM_STAGE_APPROVED_ID:}
-  stage-rejected-id: ${AMOCRM_STAGE_REJECTED_ID:}
   # Secret embedded in the webhook callback URL path itself (POST /webhooks/amocrm/documents/{secret}),
   # not a header — amoCRM's classic webhooks don't reliably sign their payload.
   webhook-secret: ${AMOCRM_WEBHOOK_SECRET:}
-  # Optional extra layer, comma-separated. Empty = disabled (amoCRM doesn't publish a
-  # fixed egress IP list — fill this in once real traffic shows what to expect).
-  webhook-ip-allowlist: ${AMOCRM_WEBHOOK_IP_ALLOWLIST:}
-  # Custom field IDs on the amoCRM lead — set in amoCRM's UI, then copied here (not
-  # something we can invent from code). See umc/document-verification-plan.md "amoCRM".
-  field-document-type-id: ${AMOCRM_FIELD_DOCUMENT_TYPE_ID:}
-  field-document-id-id: ${AMOCRM_FIELD_DOCUMENT_ID_ID:}
-  field-file-link-id: ${AMOCRM_FIELD_FILE_LINK_ID:}
-  field-ocr-confidence-id: ${AMOCRM_FIELD_OCR_CONFIDENCE_ID:}
-  connect-timeout-ms: 2000
-  read-timeout-ms: 10000
