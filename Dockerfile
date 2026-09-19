@@ -1,5 +1,5 @@
 # ─── Stage 1: Build ───────────────────────────────────────────
-FROM maven:3.9.15-eclipse-temurin-21 AS builder
+FROM maven:3.9.15-eclipse-temurin-25 AS builder
 WORKDIR /app
 
 # Copy POM first — Docker caches this layer and only re-downloads
@@ -11,7 +11,7 @@ COPY src src
 RUN mvn package -DskipTests -B -q
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────
-FROM eclipse-temurin:21.0.10_7-jre-alpine AS runtime
+FROM eclipse-temurin:25-jre-alpine AS runtime
 
 # Security: run as non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
