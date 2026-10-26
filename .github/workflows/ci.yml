@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: mesoreal/umc-integration-service
+  IMAGE_NAME: mesoreal/integration-service
   INFRA_REPO: Mesoreal/mesoreal-k8s
 
 jobs:
@@ -60,10 +60,10 @@ jobs:
           NEW_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract_branch.outputs.branch }}-${{ github.sha }}
         run: |
           git clone https://x-access-token:${APP_TOKEN}@github.com/${{ env.INFRA_REPO }}.git
-          cd mesoreal-k8s/apps/umc-integration-service/$ENV_DIR
-          kustomize edit set image ghcr.io/mesoreal/umc-integration-service=$NEW_IMAGE
+          cd mesoreal-k8s/apps/integration-service/$ENV_DIR
+          kustomize edit set image ghcr.io/mesoreal/integration-service=$NEW_IMAGE
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Deploy umc-integration-service to ${{ steps.extract_branch.outputs.branch }} (sha: ${{ github.sha }})"
+          git commit -m "Deploy integration-service to ${{ steps.extract_branch.outputs.branch }} (sha: ${{ github.sha }})"
           git push

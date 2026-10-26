@@ -1,11 +1,11 @@
-package ru.provless.umc.service;
+package ru.provless.integration.umc.service;
 
+import ru.provless.integration.umc.entity.DocumentReview;
+import ru.provless.integration.umc.entity.DocumentReviewAudit;
+import ru.provless.integration.umc.entity.DocumentReviewAuditEventType;
+import ru.provless.integration.umc.repository.DocumentReviewAuditRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import ru.provless.umc.entity.DocumentReview;
-import ru.provless.umc.entity.DocumentReviewAudit;
-import ru.provless.umc.entity.DocumentReviewAuditEventType;
-import ru.provless.umc.repository.DocumentReviewAuditRepository;
 
 import java.util.Map;
 

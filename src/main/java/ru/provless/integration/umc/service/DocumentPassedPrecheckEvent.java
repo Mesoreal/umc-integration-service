@@ -1,4 +1,4 @@
-package ru.provless.umc.service;
+package ru.provless.integration.umc.service;
 
 import java.util.UUID;
 

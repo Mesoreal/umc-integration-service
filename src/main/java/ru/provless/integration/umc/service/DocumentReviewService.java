@@ -1,21 +1,21 @@
-package ru.provless.umc.service;
+package ru.provless.integration.umc.service;
 
+import ru.provless.integration.ocr.OcrClient;
+import ru.provless.integration.ocr.OcrResult;
+import ru.provless.integration.profile.FileContent;
+import ru.provless.integration.profile.ProfileServiceClient;
+import ru.provless.integration.umc.dto.PrecheckRequest;
+import ru.provless.integration.umc.dto.PrecheckResponse;
+import ru.provless.integration.umc.dto.PrecheckVerdict;
+import ru.provless.integration.umc.entity.DocumentReview;
+import ru.provless.integration.umc.entity.DocumentReviewAuditEventType;
+import ru.provless.integration.umc.entity.DocumentReviewStatus;
+import ru.provless.integration.umc.repository.DocumentReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.provless.umc.client.FileContent;
-import ru.provless.umc.client.ProfileServiceClient;
-import ru.provless.umc.client.ocr.OcrClient;
-import ru.provless.umc.client.ocr.OcrResult;
-import ru.provless.umc.dto.PrecheckRequest;
-import ru.provless.umc.dto.PrecheckResponse;
-import ru.provless.umc.dto.PrecheckVerdict;
-import ru.provless.umc.entity.DocumentReview;
-import ru.provless.umc.entity.DocumentReviewAuditEventType;
-import ru.provless.umc.entity.DocumentReviewStatus;
-import ru.provless.umc.repository.DocumentReviewRepository;
 
 import java.math.BigDecimal;
 import java.util.Map;

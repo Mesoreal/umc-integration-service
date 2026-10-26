@@ -1,5 +1,9 @@
-package ru.provless.umc.service;
+package ru.provless.integration.umc.service;
 
+import ru.provless.integration.umc.entity.DocumentReview;
+import ru.provless.integration.umc.entity.DocumentReviewAuditEventType;
+import ru.provless.integration.umc.entity.DocumentReviewStatus;
+import ru.provless.integration.umc.repository.DocumentReviewRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,10 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import ru.provless.umc.entity.DocumentReview;
-import ru.provless.umc.entity.DocumentReviewAuditEventType;
-import ru.provless.umc.entity.DocumentReviewStatus;
-import ru.provless.umc.repository.DocumentReviewRepository;
 
 import java.util.Map;
 import java.util.Optional;

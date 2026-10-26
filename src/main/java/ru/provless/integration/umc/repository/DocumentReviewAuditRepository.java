@@ -1,7 +1,7 @@
-package ru.provless.umc.repository;
+package ru.provless.integration.umc.repository;
 
+import ru.provless.integration.umc.entity.DocumentReviewAudit;
 import org.springframework.data.jpa.repository.JpaRepository;
-import ru.provless.umc.entity.DocumentReviewAudit;
 
 import java.util.UUID;
 

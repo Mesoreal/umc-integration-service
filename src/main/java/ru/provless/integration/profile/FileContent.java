@@ -1,4 +1,4 @@
-package ru.provless.umc.client;
+package ru.provless.integration.profile;
 
 public record FileContent(byte[] data, String contentType) {
 }

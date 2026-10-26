@@ -1,4 +1,4 @@
-package ru.provless.umc.config;
+package ru.provless.integration.common.config;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;

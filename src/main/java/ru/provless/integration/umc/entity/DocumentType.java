@@ -1,4 +1,4 @@
-package ru.provless.umc.entity;
+package ru.provless.integration.umc.entity;
 
 /**
  * Mirrors ru.provless.profile.entity.DocumentType in profile-service — the two

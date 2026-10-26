@@ -1,5 +1,11 @@
-package ru.provless.umc.service;
+package ru.provless.integration.umc.service;
 
+import ru.provless.integration.amocrm.AmoCrmClient;
+import ru.provless.integration.profile.ContactInfo;
+import ru.provless.integration.profile.ProfileServiceClient;
+import ru.provless.integration.umc.entity.DocumentReview;
+import ru.provless.integration.umc.entity.DocumentReviewAuditEventType;
+import ru.provless.integration.umc.repository.DocumentReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -7,12 +13,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-import ru.provless.umc.client.ContactInfo;
-import ru.provless.umc.client.ProfileServiceClient;
-import ru.provless.umc.client.amocrm.AmoCrmClient;
-import ru.provless.umc.entity.DocumentReview;
-import ru.provless.umc.entity.DocumentReviewAuditEventType;
-import ru.provless.umc.repository.DocumentReviewRepository;
 
 import java.util.Map;
 
@@ -29,7 +29,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AmoCrmLeadService {
 
-    @Value("${umc.public-base-url}")
+    @Value("${integration.public-base-url}")
     private String publicBaseUrl;
 
     private final DocumentReviewRepository documentReviewRepository;

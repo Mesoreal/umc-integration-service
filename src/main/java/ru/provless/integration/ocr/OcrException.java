@@ -1,5 +1,7 @@
-package ru.provless.umc.exception;
+package ru.provless.integration.ocr;
 
+import ru.provless.integration.common.error.ApiException;
+import ru.provless.integration.common.error.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 /** Yandex Vision OCR call failed or timed out — the caller (profile-service) should fail-open. */

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Разово накатывает секреты umc-integration-service в mesoreal-secrets на сервере.
+# Разово накатывает секреты integration-service в mesoreal-secrets на сервере.
 #
 # Использование:
 #   cp .env.example .env && vim .env   # заполнить реальными значениями

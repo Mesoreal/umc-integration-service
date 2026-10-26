@@ -1,7 +1,7 @@
-package ru.provless.umc.service;
+package ru.provless.integration.umc.service;
 
+import ru.provless.integration.umc.entity.DocumentType;
 import org.springframework.stereotype.Component;
-import ru.provless.umc.entity.DocumentType;
 
 import java.util.EnumMap;
 import java.util.List;

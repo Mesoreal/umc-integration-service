@@ -1,5 +1,7 @@
-package ru.provless.umc.exception;
+package ru.provless.integration.profile;
 
+import ru.provless.integration.common.error.ApiException;
+import ru.provless.integration.common.error.ErrorCode;
 import org.springframework.http.HttpStatus;
 
 /** Could not fetch the client's contact info (phone/name) from profile-service's internal API. */

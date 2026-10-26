@@ -1,44 +1,77 @@
-# umc-integration-service
+# integration-service
 
-Интеграция с УМЦ (учебно-методический центр): CRM, расписание курсов/занятий,
-уведомления слушателям, проверка документов слушателей.
+Все интеграции бэкенда с внешними системами: УМЦ (проверка документов, amoCRM, Yandex OCR)
+и Chatwoot (чат менеджеров). До 2026-10-25 сервис назывался `umc-integration-service` и лежал
+в `umc/`; новые внешние системы добавляются сюда отдельным пакетом, а не в доменные сервисы.
 
-## Зона ответственности
+## Пакеты
 
-- Синхронизация карточек клиентов с CRM УМЦ.
-- Расписание курсов, преподавателей, групп.
-- Уведомления, связанные с обучением (напоминания о занятиях, изменения расписания и т.п.).
-- Проверка документов (паспорт, диплом, свидетельство о браке): OCR-precheck,
-  очередь ручной проверки и интеграция с amoCRM, приём вебхука о решении менеджера.
-  Документы нужны именно для зачисления в учебный центр — это бизнес-логика УМЦ,
-  а не отдельная административная функция (было запланировано как отдельный
-  `administrator-service` — решение перенесено сюда, чтобы граница сервиса совпадала
-  с границей бизнес-ответственности). Полный технический план: [document-verification-plan.md](../document-verification-plan.md).
+| Пакет | Что внутри |
+|---|---|
+| `umc` | Проверка документов слушателей УМЦ: OCR-precheck, сделка в amoCRM, вебхук о решении менеджера. Бизнес-логика УМЦ; план — [document-verification-plan.md](../umc/document-verification-plan.md). |
+| `amocrm` | Клиент amoCRM API v4 и хранение OAuth2-токенов. |
+| `ocr` | Yandex Vision OCR. |
+| `chatwoot` | Контакт приложения в Chatwoot: при регистрации пользователь привязывается к контакту с тем же телефоном. План — [plan-app-contact-merge.md](../docs/backend/artifacts/shop/chatwoot/plan-app-contact-merge.md). |
+| `profile` | Клиент внутреннего API profile-service. |
+| `common` | Внутренняя авторизация `/internal/**`, RabbitMQ, обработка ошибок. |
 
 ## Что НЕ входит
 
-- Хранение профиля/идентичности клиента — это [profile-service](../../profile-service).
-- Логика клиники (врачи, приёмы) — это [clinic-integration-service](../../clinic/clinic-integration-service).
+- Хранение профиля/идентичности клиента — это [profile-service](../profile-service).
+- Логика клиники (врачи, приёмы) — это [clinic-integration-service](../clinic/clinic-integration-service).
+- Мосты мессенджеров (WhatsApp, Telegram, MAX, VK → Chatwoot) — отдельные процессы в
+  [shop/chatwoot](../shop/chatwoot): другой стек и долгоживущие сессии мессенджеров.
+
+## Данные
+
+БД `integration_db`, пользователь `integration_user`. Схема `umc` — проверка документов и токены amoCRM,
+схема `chatwoot` — `app_contact_link` (пользователь приложения ↔ контакт Chatwoot). Миграции Flyway —
+`src/main/resources/db/migration/<схема>/`, номера версий общие на все папки.
 
 ## Взаимодействие с другими сервисами
 
-- `profile-service → umc-integration-service`: синхронный `POST /internal/document-review/precheck`.
-- `umc-integration-service → profile-service`: `GET /internal/storage/{userId}/{fileId}` (байты файла)
-  и `GET /internal/profiles/{userId}/contact-info` (телефон/имя — для контакта в amoCRM).
+- `profile-service → integration-service`: синхронный `POST /internal/document-review/precheck`.
+- `integration-service → profile-service`: `GET /internal/storage/{userId}/{fileId}` (байты файла)
+  и `GET /internal/profiles/{userId}/contact-info` (телефон/имя — для контактов amoCRM и Chatwoot).
   Оба защищены общим `X-Internal-Auth` (`INTERNAL_API_KEY`), как auth-service ↔ phone-auth.
-- `umc-integration-service → amoCRM`: API v4, OAuth2 (refresh-токен ротируется amoCRM
-  при каждом использовании — текущий хранится в БД, `AMOCRM_REFRESH_TOKEN` только
-  сеет первую запись).
-- `GET /files/document-review/{reviewId}/{token}` и `POST /webhooks/amocrm/documents/{secret}` —
-  единственные публичные роуты (не `/internal/**`): ссылка на файл в карточке amoCRM и
-  приём вебхука о смене этапа сделки. Оба аутентифицированы секретом/токеном в самом
-  пути, а не сессией или заголовком — у amoCRM нет гарантированной подписи payload для
-  классических вебхуков, поэтому секрет здесь наш собственный, а не то, что шлёт amoCRM.
-- RabbitMQ — общий дефолтный vhost `/` со всеми сервисами (не отдельный vhost),
-  изоляция по префиксу имени очереди (`umc.*`).
+- `integration-service → amoCRM`: API v4, OAuth2 (refresh-токен ротируется amoCRM при каждом
+  использовании — текущий хранится в БД, `AMOCRM_REFRESH_TOKEN` только сеет первую запись).
+- `integration-service → Chatwoot`: application API v1, токен сервисного пользователя-администратора
+  (`CHATWOOT_API_TOKEN`), `CHATWOOT_ENABLED=false` — интеграция выключена.
+- RabbitMQ (общий vhost `/`, изоляция по префиксу имени очереди). Сервис читает:
+  - `auth.user-registered` `{userId, phone}` — первый вход с этим телефоном → привязать к контакту Chatwoot;
+  - `profile.contacts-updated` `{userId}` — могло смениться ФИО → обновить имя контакта.
 
-Статус: Фаза 1 (precheck), Фаза 2 (создание сделки в amoCRM) и Фаза 3 (приём вебхука,
-обновление статуса `document_review`) реализованы и живьём проверены на реальном
-Postgres/RabbitMQ (миграции, старт контекста, HTTP-эндпоинты) — но не на реальном
-amoCRM/Yandex OCR аккаунте (все `AMOCRM_*`/`YANDEX_*` — плейсхолдеры). Фаза 4
-(публикация `document.approved/rejected` в profile-service + уведомление клиента) — не начата.
+  Ошибка обработки повторяется 5 раз (2–30 с), затем сообщение уходит в `<очередь>.dlq`. Очереди
+  объявляют и производители, и этот сервис — с одинаковыми аргументами dead-letter.
+  `integration.document-uploaded` (резерв precheck при сбое синхронного вызова) объявлена в
+  profile-service, потребителя пока нет.
+- `POST /internal/chatwoot/app-contacts/{userId}/ensure` → `{"contactId": …}` — ленивая привязка
+  (BE-19: первое открытие чата) и ручной ремонт пропущенного события.
+- Публичные роуты (не `/internal/**`): `GET /files/document-review/{reviewId}/{token}` и
+  `POST /webhooks/amocrm/documents/{secret}` — ссылка на файл в карточке amoCRM и вебхук о смене
+  этапа сделки. Аутентифицированы секретом/токеном в пути: у классических вебхуков amoCRM нет
+  гарантированной подписи payload.
+
+## Как Chatwoot-контакт выбирается
+
+Один телефон = один человек = один контакт: Chatwoot держит телефон уникальным в аккаунте, мосты
+мессенджеров уже переиспользуют контакт с тем же номером. Приложение — ещё один канал контакта
+(inbox «Приложение», `source_id = userId`, `custom_attributes.app_user_id`):
+
+1. есть `app_contact_link` и контакт жив → только обновить имя;
+2. контакт с подтверждённым телефоном (точное совпадение) → добавить ему канал приложения;
+3. иначе создать контакт сразу с каналом приложения; 422 при создании (гонка с мостом) → шаг 2.
+
+ФИО из профиля заменяет только пустое имя, телефон или заглушку моста (`Telegram 123`, `VK id123`,
+`MAX 123`) — имя, введённое менеджером, не трогается. Review-аккаунты в Chatwoot не попадают
+(auth-service не отправляет для них событие).
+
+## Статус
+
+УМЦ: Фаза 1 (precheck), Фаза 2 (сделка в amoCRM) и Фаза 3 (вебхук, статус `document_review`)
+реализованы и проверены на реальном Postgres/RabbitMQ, но не на реальном amoCRM/Yandex OCR
+(`AMOCRM_*`/`YANDEX_*` — плейсхолдеры). Фаза 4 (`document.approved/rejected` → profile-service +
+уведомление клиента) не начата.
+
+Chatwoot: привязка контакта при регистрации — итерация 1, локальный стек (`local/`).

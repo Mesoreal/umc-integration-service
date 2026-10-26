@@ -1,4 +1,4 @@
-package ru.provless.umc.dto;
+package ru.provless.integration.umc.dto;
 
 public enum PrecheckVerdict {
     PASS,

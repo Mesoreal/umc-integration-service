@@ -1,4 +1,4 @@
-package ru.provless.umc.exception;
+package ru.provless.integration.common.error;
 
 import lombok.Getter;
 import org.springframework.http.HttpStatus;

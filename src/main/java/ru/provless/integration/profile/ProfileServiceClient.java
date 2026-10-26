@@ -1,4 +1,4 @@
-package ru.provless.umc.client;
+package ru.provless.integration.profile;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import jakarta.annotation.PostConstruct;
@@ -8,11 +8,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
-import ru.provless.umc.exception.ProfileContactFetchException;
-import ru.provless.umc.exception.ProfileFileFetchException;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -50,7 +50,7 @@ public class ProfileServiceClient {
                 .baseUrl(baseUrl)
                 .requestFactory(factory)
                 .defaultHeader("X-Internal-Auth", internalApiKey)
-                .defaultHeader("User-Agent", "umc-integration-service")
+                .defaultHeader("User-Agent", "integration-service")
                 .build();
 
         log.info("ProfileServiceClient initialized: baseUrl={} connectTimeoutMs={} readTimeoutMs={}",
@@ -89,6 +89,18 @@ public class ProfileServiceClient {
             return new ContactInfo(json.path("phone").asText(null), json.path("fullName").asText(null));
         } catch (Exception e) {
             throw new ProfileContactFetchException("Failed to fetch contact info for userId=" + userId + " from profile-service", e);
+        }
+    }
+
+    /** Like {@link #fetchContactInfo}, but empty when the profile does not exist yet (it is created lazily). */
+    public Optional<ContactInfo> findContactInfo(UUID userId) {
+        try {
+            return Optional.of(fetchContactInfo(userId));
+        } catch (ProfileContactFetchException e) {
+            if (e.getCause() instanceof HttpClientErrorException.NotFound) {
+                return Optional.empty();
+            }
+            throw e;
         }
     }
 }

@@ -1,4 +1,4 @@
-package ru.provless.umc.client.ocr;
+package ru.provless.integration.ocr;
 
 import java.math.BigDecimal;
 

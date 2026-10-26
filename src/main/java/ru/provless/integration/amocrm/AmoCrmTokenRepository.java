@@ -1,7 +1,6 @@
-package ru.provless.umc.repository;
+package ru.provless.integration.amocrm;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import ru.provless.umc.entity.AmoCrmToken;
 
 public interface AmoCrmTokenRepository extends JpaRepository<AmoCrmToken, Short> {
 }

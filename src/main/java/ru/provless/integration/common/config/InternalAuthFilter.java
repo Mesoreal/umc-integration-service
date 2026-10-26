@@ -1,4 +1,4 @@
-package ru.provless.umc.config;
+package ru.provless.integration.common.config;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,7 +16,7 @@ import java.io.IOException;
 /**
  * Authenticates inbound HTTP traffic to {@code /internal/*} routes.
  *
- * umc-integration-service exposes only internal endpoints (precheck), all of which must
+ * integration-service exposes only internal endpoints (precheck), all of which must
  * carry an {@code X-Internal-Auth} header matching the shared {@code INTERNAL_API_KEY} —
  * the same mesh-wide secret already used between auth-service and phone-auth.
  *

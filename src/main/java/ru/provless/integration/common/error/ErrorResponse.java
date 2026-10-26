@@ -1,4 +1,4 @@
-package ru.provless.umc.dto;
+package ru.provless.integration.common.error;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;

@@ -1,4 +1,4 @@
-package ru.provless.umc.entity;
+package ru.provless.integration.umc.entity;
 
 public enum DocumentReviewStatus {
     RECEIVED,

@@ -1,7 +1,7 @@
-package ru.provless.umc.service;
+package ru.provless.integration.umc.service;
 
+import ru.provless.integration.umc.entity.DocumentType;
 import org.junit.jupiter.api.Test;
-import ru.provless.umc.entity.DocumentType;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

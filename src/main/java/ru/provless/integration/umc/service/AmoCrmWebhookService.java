@@ -1,16 +1,16 @@
-package ru.provless.umc.service;
+package ru.provless.integration.umc.service;
 
+import ru.provless.integration.umc.dto.AmoCrmLeadStatusChange;
+import ru.provless.integration.umc.entity.DocumentReview;
+import ru.provless.integration.umc.entity.DocumentReviewAuditEventType;
+import ru.provless.integration.umc.entity.DocumentReviewStatus;
+import ru.provless.integration.umc.repository.DocumentReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.MultiValueMap;
-import ru.provless.umc.dto.AmoCrmLeadStatusChange;
-import ru.provless.umc.entity.DocumentReview;
-import ru.provless.umc.entity.DocumentReviewAuditEventType;
-import ru.provless.umc.entity.DocumentReviewStatus;
-import ru.provless.umc.repository.DocumentReviewRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 
 /**
  * Stage 8 of the plan: amoCRM's webhook when a deal's stage changes in the "Проверка
- * документов" pipeline. Only updates umc-integration-service's own {@code document_review}
+ * документов" pipeline. Only updates integration-service's own {@code document_review}
  * status — publishing {@code document.approved}/{@code document.rejected} to profile-service
  * is Phase 4, not this.
  *

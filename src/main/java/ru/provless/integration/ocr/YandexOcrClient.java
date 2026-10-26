@@ -1,4 +1,4 @@
-package ru.provless.umc.client.ocr;
+package ru.provless.integration.ocr;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import ru.provless.umc.exception.OcrException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -63,7 +62,7 @@ public class YandexOcrClient implements OcrClient {
         restClient = RestClient.builder()
                 .requestFactory(factory)
                 .defaultHeader("Authorization", "Api-Key " + apiKey)
-                .defaultHeader("User-Agent", "umc-integration-service")
+                .defaultHeader("User-Agent", "integration-service")
                 .build();
     }
 

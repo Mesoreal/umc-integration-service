@@ -1,11 +1,11 @@
 spring:
   application:
-    name: umc-integration-service
+    name: integration-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/umc_db}
-    username: ${SPRING_DATASOURCE_USERNAME:umc_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:umc_password}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/integration_db}
+    username: ${SPRING_DATASOURCE_USERNAME:integration_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:integration_password}
 
   jpa:
     hibernate:
@@ -21,16 +21,27 @@ spring:
   rabbitmq:
     host: ${SPRING_RABBITMQ_HOST:localhost}
     port: ${SPRING_RABBITMQ_PORT:5672}
-    username: ${SPRING_RABBITMQ_USERNAME:umc_user}
-    password: ${SPRING_RABBITMQ_PASSWORD:umc_password}
-    # Shared default vhost with profile-service — isolation is by queue-name
-    # convention (profile.*, umc.*), not by RabbitMQ vhost.
+    username: ${SPRING_RABBITMQ_USERNAME:integration_user}
+    password: ${SPRING_RABBITMQ_PASSWORD:integration_password}
+    # Shared default vhost with the other services — isolation is by queue-name
+    # convention (auth.*, profile.*, integration.*), not by RabbitMQ vhost.
     virtual-host: ${SPRING_RABBITMQ_VIRTUAL_HOST:/}
+    listener:
+      simple:
+        # A listener failure is retried in-process, then dead-lettered to <queue>.dlq
+        # (see RabbitConfig) instead of being redelivered forever.
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 5
+          initial-interval: 2s
+          multiplier: 2
+          max-interval: 30s
 
 logging:
   level:
     root: INFO
-    ru.provless.umc: DEBUG
+    ru.provless.integration: DEBUG
 
 # Shared secret authenticating inbound /internal/* requests (from profile-service).
 # Same mesh-wide key already used between auth-service and phone-auth.
@@ -59,8 +70,8 @@ yandex:
 
 # Public URL other systems (amoCRM, a manager's browser) use to reach this service —
 # unlike PROFILE_SERVICE_URL, this can't be the internal cluster DNS name.
-umc:
-  public-base-url: ${UMC_PUBLIC_BASE_URL:http://localhost:8091}
+integration:
+  public-base-url: ${INTEGRATION_PUBLIC_BASE_URL:http://localhost:8091}
 
 # amoCRM (Фаза 2: создание сделки; Фаза 3: приём вебхука о смене этапа).
 #
@@ -95,3 +106,18 @@ amocrm:
   # Secret embedded in the webhook callback URL path itself (POST /webhooks/amocrm/documents/{secret}),
   # not a header — amoCRM's classic webhooks don't reliably sign their payload.
   webhook-secret: ${AMOCRM_WEBHOOK_SECRET:}
+
+# Chatwoot (менеджерский чат): контакт приложения при регистрации — один телефон = один контакт,
+# приложение = ещё один канал контакта (inbox «Приложение»). План:
+# docs/backend/artifacts/shop/chatwoot/plan-app-contact-merge.md
+chatwoot:
+  enabled: ${CHATWOOT_ENABLED:false}
+  base-url: ${CHATWOOT_URL:http://localhost:3000}
+  account-id: ${CHATWOOT_ACCOUNT_ID:}
+  # Токен отдельного сервисного пользователя-администратора Chatwoot, не личный.
+  api-token: ${CHATWOOT_API_TOKEN:}
+  app-inbox-name: ${CHATWOOT_APP_INBOX_NAME:Приложение}
+  # Пусто — найти inbox по имени или создать.
+  app-inbox-id: ${CHATWOOT_APP_INBOX_ID:}
+  connect-timeout-ms: 2000
+  read-timeout-ms: 10000

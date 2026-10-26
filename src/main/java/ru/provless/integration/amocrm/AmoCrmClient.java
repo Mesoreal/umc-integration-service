@@ -1,4 +1,4 @@
-package ru.provless.umc.client.amocrm;
+package ru.provless.integration.amocrm;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -10,9 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import ru.provless.umc.entity.AmoCrmToken;
-import ru.provless.umc.exception.AmoCrmException;
-import ru.provless.umc.repository.AmoCrmTokenRepository;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -72,7 +69,7 @@ public class AmoCrmClient {
         factory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
         restClient = RestClient.builder()
                 .requestFactory(factory)
-                .defaultHeader("User-Agent", "umc-integration-service")
+                .defaultHeader("User-Agent", "integration-service")
                 .build();
     }
 
