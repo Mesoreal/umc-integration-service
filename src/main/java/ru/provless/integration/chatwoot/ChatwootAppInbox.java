@@ -23,6 +23,7 @@ public class ChatwootAppInbox {
     private String configuredInboxId;
 
     private volatile Long inboxId;
+    private volatile String identifier;
 
     public long id() {
         Long cached = inboxId;
@@ -34,6 +35,20 @@ public class ChatwootAppInbox {
                 inboxId = resolve();
             }
             return inboxId;
+        }
+    }
+
+    /** The inbox's channel identifier (key of its public API), fetched once. */
+    public String identifier() {
+        String cached = identifier;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (identifier == null) {
+                identifier = chatwootClient.findInboxIdentifier(id());
+            }
+            return identifier;
         }
     }
 

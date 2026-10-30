@@ -14,18 +14,18 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitConfig {
 
-    public static final String USER_REGISTERED_QUEUE = "auth.user-registered";
+    public static final String USER_LOGGED_IN_QUEUE = "auth.user-logged-in";
     public static final String PROFILE_CONTACTS_UPDATED_QUEUE = "profile.contacts-updated";
     private static final String DLQ_SUFFIX = ".dlq";
 
     @Bean
-    public Queue userRegisteredQueue() {
-        return withDeadLetter(USER_REGISTERED_QUEUE);
+    public Queue userLoggedInQueue() {
+        return withDeadLetter(USER_LOGGED_IN_QUEUE);
     }
 
     @Bean
-    public Queue userRegisteredDeadLetterQueue() {
-        return QueueBuilder.durable(USER_REGISTERED_QUEUE + DLQ_SUFFIX).build();
+    public Queue userLoggedInDeadLetterQueue() {
+        return QueueBuilder.durable(USER_LOGGED_IN_QUEUE + DLQ_SUFFIX).build();
     }
 
     @Bean

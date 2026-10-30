@@ -39,7 +39,8 @@
 - `integration-service → Chatwoot`: application API v1, токен сервисного пользователя-администратора
   (`CHATWOOT_API_TOKEN`), `CHATWOOT_ENABLED=false` — интеграция выключена.
 - RabbitMQ (общий vhost `/`, изоляция по префиксу имени очереди). Сервис читает:
-  - `auth.user-registered` `{userId, phone}` — первый вход с этим телефоном → привязать к контакту Chatwoot;
+  - `auth.user-logged-in` `{userId, phone}` — каждый вход по OTP (кроме review-номеров) → привязать к контакту Chatwoot
+    (идемпотентно: уже привязанный — только проверка контакта и имени);
   - `profile.contacts-updated` `{userId}` — могло смениться ФИО → обновить имя контакта.
 
   Ошибка обработки повторяется 5 раз (2–30 с), затем сообщение уходит в `<очередь>.dlq`. Очереди

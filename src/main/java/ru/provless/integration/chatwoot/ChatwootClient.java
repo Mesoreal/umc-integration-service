@@ -127,7 +127,22 @@ public class ChatwootClient {
         call(HttpMethod.POST, "/contacts/" + contactId + "/contact_inboxes", body, false);
     }
 
+    /**
+     * The contact that owns {@code sourceId} in an API inbox. The application API has no lookup by contact_inbox;
+     * the public API of the inbox has ({@code inboxIdentifier} — the channel's identifier, not its id).
+     */
+    public Optional<Long> findContactIdBySourceId(String inboxIdentifier, String sourceId) {
+        String uri = "/public/api/v1/inboxes/" + encode(inboxIdentifier) + "/contacts/" + encode(sourceId);
+        JsonNode json = send(HttpMethod.GET, uri, null, true, "GET public contact");
+        return json == null ? Optional.empty() : Optional.of(json.path("id").asLong());
+    }
+
     // ─── Inboxes ────────────────────────────────────────────────────────────
+
+    /** The channel identifier of an API inbox — the key of its public API. */
+    public String findInboxIdentifier(long inboxId) {
+        return call(HttpMethod.GET, "/inboxes/" + inboxId, null, false).path("inbox_identifier").asText();
+    }
 
     public Optional<Long> findInboxIdByName(String name) {
         for (JsonNode inbox : call(HttpMethod.GET, "/inboxes", null, false).path("payload")) {
@@ -151,7 +166,10 @@ public class ChatwootClient {
     // ─── HTTP ───────────────────────────────────────────────────────────────
 
     private JsonNode call(HttpMethod method, String path, JsonNode body, boolean notFoundAsNull) {
-        String uri = "/api/v1/accounts/" + accountIdRaw + path;
+        return send(method, "/api/v1/accounts/" + accountIdRaw + path, body, notFoundAsNull, method + " " + path);
+    }
+
+    private JsonNode send(HttpMethod method, String uri, JsonNode body, boolean notFoundAsNull, String what) {
         try {
             RestClient.RequestBodySpec request = restClient.method(method).uri(uri);
             if (body != null) {
@@ -163,11 +181,15 @@ public class ChatwootClient {
             if (notFoundAsNull && e.getStatusCode().value() == 404) {
                 return null;
             }
-            throw new ChatwootException("Chatwoot " + method + " " + path + " failed: " + e.getStatusCode().value()
+            throw new ChatwootException("Chatwoot " + what + " failed: " + e.getStatusCode().value()
                     + " " + e.getResponseBodyAsString(), e.getStatusCode().value(), e);
         } catch (Exception e) {
-            throw new ChatwootException("Chatwoot " + method + " " + path + " failed", 0, e);
+            throw new ChatwootException("Chatwoot " + what + " failed", 0, e);
         }
+    }
+
+    private static String encode(String value) {
+        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     private ChatwootContact toContact(JsonNode json) {

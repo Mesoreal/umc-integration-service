@@ -156,6 +156,46 @@ class AppContactServiceTest {
     }
 
     @Test
+    void mergedIntoAContactWithAnotherPhoneIsFoundByTheAppChannel() {
+        noProfile();
+        AppContactLink stale = new AppContactLink(USER_ID, 42);
+        when(linkRepository.findById(USER_ID)).thenReturn(Optional.of(stale));
+        when(chatwootClient.findContact(42)).thenReturn(Optional.empty());
+        when(appInbox.id()).thenReturn(INBOX_ID);
+        when(appInbox.identifier()).thenReturn("app-inbox");
+        // An agent merged the app contact into a messenger contact that keeps its own phone: only the channel leads there.
+        when(chatwootClient.findContactIdBySourceId("app-inbox", USER_ID.toString())).thenReturn(Optional.of(77L));
+        when(chatwootClient.findContact(77)).thenReturn(Optional.of(new ChatwootContact(77, "Иван", "+79990000000", "wa_79990000000", Map.of())));
+
+        assertThat(service.ensure(USER_ID, PHONE)).isEqualTo(77);
+
+        verify(chatwootClient, never()).findContactByPhone(any());
+        verify(chatwootClient, never()).createContact(any(), any(), any(), anyMap(), anyLong(), any());
+        assertLinkSaved(77);
+    }
+
+    @Test
+    void phoneIsMatchedInTheBridgesFormat() {
+        noProfile();
+        when(linkRepository.findById(USER_ID)).thenReturn(Optional.empty());
+        when(appInbox.id()).thenReturn(INBOX_ID);
+        when(chatwootClient.findContactByPhone(PHONE)).thenReturn(Optional.of(contact(7, "Иван")));
+
+        assertThat(service.ensure(USER_ID, "8 (900) 123-45-67")).isEqualTo(7);
+    }
+
+    @Test
+    void phoneNormalization() {
+        assertThat(AppContactService.normalizePhone("+79001234567")).isEqualTo("+79001234567");
+        assertThat(AppContactService.normalizePhone("79001234567")).isEqualTo("+79001234567");
+        assertThat(AppContactService.normalizePhone("89001234567")).isEqualTo("+79001234567");
+        assertThat(AppContactService.normalizePhone("+7 900 123-45-67")).isEqualTo("+79001234567");
+        assertThat(AppContactService.normalizePhone("+5491176333637")).isEqualTo("+5491176333637");
+        assertThat(AppContactService.normalizePhone("12345")).isNull();
+        assertThat(AppContactService.normalizePhone(null)).isNull();
+    }
+
+    @Test
     void phoneComesFromTheProfileOnTheLazyPath() {
         when(profileServiceClient.findContactInfo(USER_ID)).thenReturn(Optional.of(new ContactInfo(PHONE, null)));
         when(linkRepository.findById(USER_ID)).thenReturn(Optional.of(new AppContactLink(USER_ID, 42)));

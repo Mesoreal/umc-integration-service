@@ -55,9 +55,9 @@ public class AppContactService {
         synchronized (userLocks.computeIfAbsent(userId, id -> new Object())) {
             Optional<ContactInfo> profile = profileServiceClient.findContactInfo(userId);
             String fullName = profile.map(ContactInfo::fullName).filter(n -> !n.isBlank()).orElse(null);
-            String confirmedPhone = phone != null ? phone : profile.map(ContactInfo::phone).orElse(null);
-            if (confirmedPhone == null || confirmedPhone.isBlank()) {
-                throw new IllegalStateException("No phone for userId=" + userId + " — cannot match a Chatwoot contact");
+            String confirmedPhone = normalizePhone(phone != null ? phone : profile.map(ContactInfo::phone).orElse(null));
+            if (confirmedPhone == null) {
+                throw new IllegalStateException("No valid phone for userId=" + userId + " — cannot match a Chatwoot contact");
             }
             return ensureLocked(userId, confirmedPhone, fullName);
         }
@@ -78,7 +78,7 @@ public class AppContactService {
 
         long inboxId = appInbox.id();
         String sourceId = userId.toString();
-        Optional<ChatwootContact> existing = findExisting(userId, phone);
+        Optional<ChatwootContact> existing = findExisting(userId, phone, sourceId);
         if (existing.isEmpty()) {
             try {
                 ChatwootContact created = chatwootClient.createContact(fullName != null ? fullName : phone, phone,
@@ -91,7 +91,7 @@ public class AppContactService {
                     throw e;
                 }
                 // A bridge created this person (same phone) between our lookup and create.
-                existing = findExisting(userId, phone);
+                existing = findExisting(userId, phone, sourceId);
                 if (existing.isEmpty()) {
                     throw e;
                 }
@@ -107,9 +107,37 @@ public class AppContactService {
         return contact.id();
     }
 
-    private Optional<ChatwootContact> findExisting(UUID userId, String phone) {
+    /**
+     * Most reliable key first. The app channel (contact_inbox «Приложение», source_id = userId) follows the person
+     * through a manual merge in Chatwoot, whatever phone the resulting contact keeps; then the phone; then the
+     * identifier of a contact this service created.
+     */
+    private Optional<ChatwootContact> findExisting(UUID userId, String phone, String sourceId) {
+        Optional<ChatwootContact> byChannel = chatwootClient.findContactIdBySourceId(appInbox.identifier(), sourceId)
+                .flatMap(chatwootClient::findContact);
+        if (byChannel.isPresent()) {
+            return byChannel;
+        }
         Optional<ChatwootContact> byPhone = chatwootClient.findContactByPhone(phone);
         return byPhone.isPresent() ? byPhone : chatwootClient.findContactByIdentifier(appIdentifier(userId));
+    }
+
+    /**
+     * E.164 the way the bridges write it, so that the exact phone match finds the same person: digits with a leading
+     * {@code +}, a Russian {@code 8XXXXXXXXXX} as {@code +7XXXXXXXXXX}. Null if it is not a phone.
+     */
+    static String normalizePhone(String phone) {
+        if (phone == null) {
+            return null;
+        }
+        String digits = phone.replaceAll("\\D", "");
+        if (digits.length() < 10 || digits.length() > 15) {
+            return null;
+        }
+        if (digits.length() == 11 && digits.startsWith("8")) {
+            digits = "7" + digits.substring(1);
+        }
+        return "+" + digits;
     }
 
     private void syncName(ChatwootContact contact, String fullName) {

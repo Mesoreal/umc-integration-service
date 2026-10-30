@@ -20,17 +20,17 @@ public class ChatwootEventsListener {
 
     private final AppContactService appContactService;
 
-    /** auth-service, first successful OTP of a phone. */
-    public record UserRegisteredEvent(UUID userId, String phone) {
+    /** auth-service, every successful OTP login. */
+    public record UserLoggedInEvent(UUID userId, String phone) {
     }
 
     /** profile-service, after the full name may have changed. */
     public record ProfileContactsUpdatedEvent(UUID userId) {
     }
 
-    @RabbitListener(queues = RabbitConfig.USER_REGISTERED_QUEUE, autoStartup = "${chatwoot.enabled:false}")
-    public void onUserRegistered(UserRegisteredEvent event) {
-        log.info("auth.user-registered: userId={}", event.userId());
+    @RabbitListener(queues = RabbitConfig.USER_LOGGED_IN_QUEUE, autoStartup = "${chatwoot.enabled:false}")
+    public void onUserLoggedIn(UserLoggedInEvent event) {
+        log.info("auth.user-logged-in: userId={}", event.userId());
         appContactService.ensure(event.userId(), event.phone());
     }
 
