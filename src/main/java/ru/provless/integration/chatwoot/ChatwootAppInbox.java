@@ -52,6 +52,32 @@ public class ChatwootAppInbox {
         }
     }
 
+    private volatile String webhookSecret;
+
+    /** The secret Chatwoot signs this inbox's webhook with; {@code refresh} — read it again (rotated in Chatwoot). */
+    public String webhookSecret(boolean refresh) {
+        String cached = webhookSecret;
+        if (cached != null && !refresh) {
+            return cached;
+        }
+        synchronized (this) {
+            webhookSecret = chatwootClient.inboxSettings(id()).secret();
+            return webhookSecret;
+        }
+    }
+
+    /** Points the inbox's webhook at {@code url} unless it already is; true when it had to change it. */
+    public boolean ensureWebhook(String url) {
+        ChatwootInboxSettings settings = chatwootClient.inboxSettings(id());
+        webhookSecret = settings.secret();
+        if (url.equals(settings.webhookUrl())) {
+            return false;
+        }
+        chatwootClient.setInboxWebhook(id(), url);
+        log.info("Chatwoot app inbox {} webhook set to {} (was {})", id(), url, settings.webhookUrl());
+        return true;
+    }
+
     private long resolve() {
         if (configuredInboxId != null && !configuredInboxId.isBlank()) {
             return Long.parseLong(configuredInboxId.trim());

@@ -119,5 +119,26 @@ chatwoot:
   app-inbox-name: ${CHATWOOT_APP_INBOX_NAME:Приложение}
   # Пусто — найти inbox по имени или создать.
   app-inbox-id: ${CHATWOOT_APP_INBOX_ID:}
+  # App chat connector (docs/backend/artifacts/messenger/plan-chat-connector.md): chat.outbound ↔ Chatwoot ↔ chat.inbound.
+  chat:
+    # Where Chatwoot sends the app inbox's webhook. Inside the cluster: Chatwoot already reaches in-cluster Services
+    # (SAFE_FETCH_ALLOW_PRIVATE_NETWORK=true for the bridges); the path is not published by Traefik.
+    webhook-url: ${CHATWOOT_CHAT_WEBHOOK_URL:http://integration-service:8080/webhooks/chatwoot/app}
+    # A webhook older than this is refused (its signature covers the timestamp).
+    webhook-max-age: 5m
+    # Retry pause while Chatwoot is down: doubles from the first to the max, forever (the queue waits, order kept).
+    retry-initial: 2s
+    retry-max: 60s
+    read-poll-interval: 5s
+    agents-poll-interval: 30s
+    hours-poll-interval: 10m
+  # The chat-service attachment bucket (the same one Chatwoot writes to), shared Yandex Object Storage key.
+  chat-storage:
+    endpoint: ${AWS_S3_ENDPOINT:https://storage.yandexcloud.net}
+    region: ${AWS_REGION:ru-central1}
+    bucket: ${CHAT_S3_BUCKET:chatwoot-mesoreal-app}
+    prefix: ${CHAT_S3_PREFIX:app-chat/}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
   connect-timeout-ms: 2000
   read-timeout-ms: 10000

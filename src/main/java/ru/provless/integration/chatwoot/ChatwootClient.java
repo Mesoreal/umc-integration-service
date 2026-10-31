@@ -6,22 +6,33 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.net.http.HttpClient;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * Chatwoot application API (v1, {@code api_access_token} of a dedicated service user). Only the
- * calls the app-contact sync needs; request/response shapes checked against Chatwoot 4.19.1
- * (controllers and jbuilder views of contacts, contact_inboxes, inboxes).
+ * Chatwoot application API (v1, {@code api_access_token} of a dedicated service user) and the public API of the
+ * app inbox. Only the calls the app-contact sync and the app chat connector need; request/response shapes checked
+ * against Chatwoot 4.19.1 (controllers, builders and jbuilder views of contacts, contact_inboxes, inboxes,
+ * conversations, messages, agents).
  */
 @Slf4j
 @Component
@@ -47,8 +58,12 @@ public class ChatwootClient {
 
     @PostConstruct
     void init() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofMillis(connectTimeoutMs));
+        // java.net.http, not HttpURLConnection: the latter can't send PATCH (message status, inbox webhook).
+        // HTTP/1.1 only: Chatwoot (Puma) speaks nothing else, and a cleartext h2c upgrade attempt breaks uploads.
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .build());
         factory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
         restClient = RestClient.builder()
                 .baseUrl(baseUrl)
@@ -163,6 +178,164 @@ public class ChatwootClient {
         return call(HttpMethod.POST, "/inboxes", body, false).path("id").asLong();
     }
 
+    /** Sets the inbox's webhook (API channel); the connector points it at itself on start. */
+    public void setInboxWebhook(long inboxId, String webhookUrl) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        body.putObject("channel").put("webhook_url", webhookUrl);
+        call(HttpMethod.PATCH, "/inboxes/" + inboxId, body, false);
+    }
+
+    /** Webhook, signing secret (administrators only), identifier and working hours of an API inbox. */
+    public ChatwootInboxSettings inboxSettings(long inboxId) {
+        JsonNode inbox = call(HttpMethod.GET, "/inboxes/" + inboxId, null, false);
+        List<ChatwootInboxSettings.Day> days = new ArrayList<>();
+        for (JsonNode day : inbox.path("working_hours")) {
+            boolean closed = day.path("closed_all_day").asBoolean(false);
+            boolean allDay = day.path("open_all_day").asBoolean(false);
+            String open = closed ? null : allDay ? "00:00" : time(day.path("open_hour"), day.path("open_minutes"));
+            String close = closed ? null : allDay ? "23:59" : time(day.path("close_hour"), day.path("close_minutes"));
+            days.add(new ChatwootInboxSettings.Day(day.path("day_of_week").asInt(), open, close));
+        }
+        return new ChatwootInboxSettings(inbox.path("id").asLong(), textOrNull(inbox, "webhook_url"),
+                textOrNull(inbox, "secret"), textOrNull(inbox, "inbox_identifier"),
+                inbox.path("working_hours_enabled").asBoolean(false), textOrNull(inbox, "timezone"), days);
+    }
+
+    // ─── Conversations and messages (app chat connector) ────────────────────
+
+    /**
+     * A new conversation of the contact in the inbox. The API inbox is not locked to a single conversation
+     * ({@code lock_to_single_conversation} false by default), so this really creates one — a new request.
+     */
+    public ChatwootConversation createConversation(long inboxId, long contactId, String sourceId) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        body.put("inbox_id", inboxId);
+        body.put("contact_id", contactId);
+        body.put("source_id", sourceId);
+        return toConversation(call(HttpMethod.POST, "/conversations", body, false));
+    }
+
+    public Optional<ChatwootConversation> findConversation(long conversationId) {
+        JsonNode json = call(HttpMethod.GET, "/conversations/" + conversationId, null, true);
+        return json == null ? Optional.empty() : Optional.of(toConversation(json));
+    }
+
+    /**
+     * The user's message: incoming in the API inbox. {@code sourceId} marks it as ours, so its webhook echo is
+     * recognised; {@code inReplyTo} — Chatwoot id of the quoted message.
+     *
+     * @return Chatwoot id and creation time of the message
+     */
+    public ChatwootMessageRef createIncomingMessage(long conversationId, String content, String sourceId, Long inReplyTo,
+                                                    List<ChatwootUpload> uploads) {
+        return createMessage(conversationId, content, "incoming", false, sourceId, inReplyTo, uploads);
+    }
+
+    /** A note only agents see — the user's edits and deletions (no editing of messages through the API). */
+    public ChatwootMessageRef createPrivateNote(long conversationId, String content, Long inReplyTo) {
+        return createMessage(conversationId, content, "outgoing", true, null, inReplyTo, List.of());
+    }
+
+    /** {@code delivered} / {@code read} of an agent's message; API inboxes only, the status never goes back. */
+    public void updateMessageStatus(long conversationId, long messageId, String status) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        body.put("status", status);
+        call(HttpMethod.PATCH, "/conversations/" + conversationId + "/messages/" + messageId, body, false);
+    }
+
+    public record ChatwootMessageRef(long id, Instant createdAt) {
+    }
+
+    /** The latest messages of a conversation (one page, newest last), with their {@code source_id}. */
+    public List<ChatwootMessageSummary> recentMessages(long conversationId) {
+        List<ChatwootMessageSummary> messages = new ArrayList<>();
+        for (JsonNode m : call(HttpMethod.GET, "/conversations/" + conversationId + "/messages", null, false).path("payload")) {
+            messages.add(new ChatwootMessageSummary(m.path("id").asLong(), textOrNull(m, "source_id"),
+                    epochOrNull(m.path("created_at"))));
+        }
+        return messages;
+    }
+
+    public record ChatwootMessageSummary(long id, String sourceId, Instant createdAt) {
+    }
+
+    private ChatwootMessageRef createMessage(long conversationId, String content, String messageType, boolean isPrivate,
+                                             String sourceId, Long inReplyTo, List<ChatwootUpload> uploads) {
+        String path = "/conversations/" + conversationId + "/messages";
+        JsonNode json;
+        if (uploads.isEmpty()) {
+            ObjectNode body = jsonMapper.createObjectNode();
+            if (content != null) {
+                body.put("content", content);
+            }
+            body.put("message_type", messageType);
+            body.put("private", isPrivate);
+            if (sourceId != null) {
+                body.put("source_id", sourceId);
+            }
+            if (inReplyTo != null) {
+                body.putObject("content_attributes").put("in_reply_to", inReplyTo);
+            }
+            json = call(HttpMethod.POST, path, body, false);
+        } else {
+            MultipartBodyBuilder parts = new MultipartBodyBuilder();
+            if (content != null) {
+                parts.part("content", content);
+            }
+            parts.part("message_type", messageType);
+            parts.part("private", Boolean.toString(isPrivate));
+            if (sourceId != null) {
+                parts.part("source_id", sourceId);
+            }
+            if (inReplyTo != null) {
+                // MessageBuilder parses a JSON string here
+                parts.part("content_attributes", "{\"in_reply_to\":" + inReplyTo + "}");
+            }
+            for (ChatwootUpload upload : uploads) {
+                parts.part("attachments[]", new ByteArrayResource(upload.content()) {
+                    @Override
+                    public String getFilename() {
+                        return upload.name();
+                    }
+                }).contentType(MediaType.parseMediaType(upload.mimeType()));
+            }
+            json = sendMultipart("/api/v1/accounts/" + accountIdRaw + path, parts.build(), "POST " + path);
+        }
+        return new ChatwootMessageRef(json.path("id").asLong(), epochOrNull(json.path("created_at")));
+    }
+
+    // ─── Agents ─────────────────────────────────────────────────────────────
+
+    public List<ChatwootAgent> listAgents() {
+        List<ChatwootAgent> agents = new ArrayList<>();
+        for (JsonNode agent : call(HttpMethod.GET, "/agents", null, false)) {
+            String name = textOrNull(agent, "available_name");
+            agents.add(new ChatwootAgent(agent.path("id").asLong(), name != null ? name : textOrNull(agent, "name"),
+                    agent.path("availability_status").asText("offline")));
+        }
+        return agents;
+    }
+
+    // ─── Public API of the app inbox (acts as the contact) ──────────────────
+
+    /** The user saw the conversation now: Chatwoot marks every agent message before it read. */
+    public void markSeenByContact(String inboxIdentifier, String sourceId, long conversationId) {
+        send(HttpMethod.POST, publicConversation(inboxIdentifier, sourceId, conversationId) + "/update_last_seen",
+                null, false, "POST public update_last_seen");
+    }
+
+    public void setContactTyping(String inboxIdentifier, String sourceId, long conversationId, boolean typing) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        body.put("typing_status", typing ? "on" : "off");
+        send(HttpMethod.POST, publicConversation(inboxIdentifier, sourceId, conversationId) + "/toggle_typing",
+                body, false, "POST public toggle_typing");
+    }
+
+    private static String publicConversation(String inboxIdentifier, String sourceId, long conversationId) {
+        return "/public/api/v1/inboxes/" + encode(inboxIdentifier) + "/contacts/" + encode(sourceId)
+                + "/conversations/" + conversationId;
+    }
+
     // ─── HTTP ───────────────────────────────────────────────────────────────
 
     private JsonNode call(HttpMethod method, String path, JsonNode body, boolean notFoundAsNull) {
@@ -186,6 +359,56 @@ public class ChatwootClient {
         } catch (Exception e) {
             throw new ChatwootException("Chatwoot " + what + " failed", 0, e);
         }
+    }
+
+    private JsonNode sendMultipart(String uri, MultiValueMap<String, HttpEntity<?>> parts, String what) {
+        try {
+            String response = restClient.post().uri(uri).contentType(MediaType.MULTIPART_FORM_DATA).body(parts)
+                    .retrieve().body(String.class);
+            return response == null || response.isBlank() ? jsonMapper.createObjectNode() : jsonMapper.readTree(response);
+        } catch (RestClientResponseException e) {
+            throw new ChatwootException("Chatwoot " + what + " failed: " + e.getStatusCode().value()
+                    + " " + e.getResponseBodyAsString(), e.getStatusCode().value(), e);
+        } catch (Exception e) {
+            throw new ChatwootException("Chatwoot " + what + " failed", 0, e);
+        }
+    }
+
+    private ChatwootConversation toConversation(JsonNode json) {
+        JsonNode assignee = json.path("meta").path("assignee");
+        boolean hasAssignee = assignee.isObject() && "User".equals(json.path("meta").path("assignee_type").asText(null));
+        String assigneeName = hasAssignee ? textOrNull(assignee, "available_name") : null;
+        if (hasAssignee && assigneeName == null) {
+            assigneeName = textOrNull(assignee, "name");
+        }
+        return new ChatwootConversation(
+                json.path("id").asLong(),
+                json.path("inbox_id").asLong(),
+                textOrNull(json, "status"),
+                hasAssignee ? assignee.path("id").asLong() : null,
+                assigneeName,
+                epochOrNull(json.path("agent_last_seen_at")),
+                textOrNull(json.path("contact_inbox"), "source_id"));
+    }
+
+    /** Chatwoot gives times as epoch seconds (0 = never) or as an ISO string, depending on the view. */
+    private static Instant epochOrNull(JsonNode value) {
+        if (value.isNumber()) {
+            long seconds = value.asLong();
+            return seconds <= 0 ? null : Instant.ofEpochSecond(seconds);
+        }
+        if (value.isTextual() && !value.asText().isBlank()) {
+            try {
+                return OffsetDateTime.parse(value.asText()).toInstant();
+            } catch (DateTimeParseException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static String time(JsonNode hour, JsonNode minutes) {
+        return String.format("%02d:%02d", hour.asInt(0), minutes.asInt(0));
     }
 
     private static String encode(String value) {
