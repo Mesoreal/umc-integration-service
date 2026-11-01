@@ -54,6 +54,20 @@ public class ChatInboxes {
         return ids;
     }
 
+    /** The inbox's name for people («Приложение — продажи»). */
+    public String name(long inboxId) {
+        if (inboxId == intakeId()) {
+            return intake.name();
+        }
+        return departments.departments().stream().filter(d -> departmentInboxId(d) == inboxId)
+                .map(ChatDepartments.Department::inboxName).findFirst().orElse("inbox " + inboxId);
+    }
+
+    /** The department whose inbox this is; empty for «Входящие». */
+    public java.util.Optional<ChatDepartments.Department> departmentOf(long inboxId) {
+        return departments.departments().stream().filter(d -> departmentInboxId(d) == inboxId).findFirst();
+    }
+
     /** True for an inbox of the app (known already — resolved by {@link #all()} or a department lookup). */
     public boolean isAppInbox(long inboxId) {
         return inboxId == intakeId() || departmentInbox.containsValue(inboxId);

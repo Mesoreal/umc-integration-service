@@ -18,25 +18,34 @@ class ChatwootAppInboxTest {
 
     private ChatwootAppInbox inbox() {
         ChatwootAppInbox inbox = new ChatwootAppInbox(client);
-        ReflectionTestUtils.setField(inbox, "inboxName", "Приложение — входящие");
+        ReflectionTestUtils.setField(inbox, "inboxName", "Входящие - Приложение");
         ReflectionTestUtils.setField(inbox, "configuredInboxId", "");
-        ReflectionTestUtils.setField(inbox, "legacyName", "Приложение");
+        ReflectionTestUtils.setField(inbox, "legacyName", "Приложение,Приложение — входящие");
         return inbox;
     }
 
     @Test
     void oldInbox_renamed_keepsItsHistory() {
-        when(client.findInboxIdByName("Приложение — входящие")).thenReturn(Optional.empty());
+        when(client.findInboxIdByName("Входящие - Приложение")).thenReturn(Optional.empty());
         when(client.findInboxIdByName("Приложение")).thenReturn(Optional.of(9L));
 
         assertThat(inbox().id()).isEqualTo(9L);
-        verify(client).renameInbox(9L, "Приложение — входящие");
+        verify(client).renameInbox(9L, "Входящие - Приложение");
         verify(client, never()).createApiInbox(anyString());
     }
 
     @Test
-    void renamedAlready_usedAsIs() {
+    void renamedByAnEarlierVersion_renamedAgain() {
+        when(client.findInboxIdByName(anyString())).thenReturn(Optional.empty());
         when(client.findInboxIdByName("Приложение — входящие")).thenReturn(Optional.of(9L));
+
+        assertThat(inbox().id()).isEqualTo(9L);
+        verify(client).renameInbox(9L, "Входящие - Приложение");
+    }
+
+    @Test
+    void renamedAlready_usedAsIs() {
+        when(client.findInboxIdByName("Входящие - Приложение")).thenReturn(Optional.of(9L));
 
         assertThat(inbox().id()).isEqualTo(9L);
         verify(client, never()).renameInbox(org.mockito.ArgumentMatchers.anyLong(), anyString());
@@ -45,7 +54,7 @@ class ChatwootAppInboxTest {
     @Test
     void none_created() {
         when(client.findInboxIdByName(anyString())).thenReturn(Optional.empty());
-        when(client.createApiInbox("Приложение — входящие")).thenReturn(11L);
+        when(client.createApiInbox("Входящие - Приложение")).thenReturn(11L);
 
         assertThat(inbox().id()).isEqualTo(11L);
     }

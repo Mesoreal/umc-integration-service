@@ -48,6 +48,10 @@ public class ChatMessageLink {
     @Column(name = "delivered_to_client", nullable = false)
     private boolean deliveredToClient;
 
+    /** The Chatwoot id chat-service knows the message by; stays when a transfer re-points the link to a copy. */
+    @Column(name = "external_cw_id", nullable = false)
+    private long externalCwId;
+
     public ChatMessageLink(long cwMessageId, UUID messageId, UUID userId, long conversationId, String direction,
                            OffsetDateTime cwCreatedAt) {
         this.cwMessageId = cwMessageId;
@@ -56,10 +60,11 @@ public class ChatMessageLink {
         this.conversationId = conversationId;
         this.direction = direction;
         this.cwCreatedAt = cwCreatedAt;
+        this.externalCwId = cwMessageId;
     }
 
     public String externalId() {
-        return externalId(cwMessageId);
+        return externalId(externalCwId);
     }
 
     /** How chat-service knows a Chatwoot message: {@code cw:<id>}. */

@@ -16,11 +16,25 @@ public interface ChatMessageLinkRepository extends JpaRepository<ChatMessageLink
 
     Optional<ChatMessageLink> findByMessageId(UUID messageId);
 
+    /** By the id chat-service knows (external_id {@code cw:<id>}), wherever the message lives now. */
+    Optional<ChatMessageLink> findByExternalCwId(long externalCwId);
+
+    List<ChatMessageLink> findByConversationId(long conversationId);
+
+    /** A transfer moved the message: the link now points at its copy in the new conversation. */
+    @Modifying
+    @Transactional
+    @Query(value = """
+            UPDATE chatwoot.chat_message_link SET cw_message_id = :newId, conversation_id = :conversationId, cw_created_at = :at
+            WHERE cw_message_id = :oldId""", nativeQuery = true)
+    int repoint(@Param("oldId") long oldId, @Param("newId") long newId, @Param("conversationId") long conversationId,
+                @Param("at") OffsetDateTime at);
+
     /** Managers' messages of the user up to {@code upTo} that Chatwoot does not show as delivered yet, oldest first. */
     @Query("""
             select l from ChatMessageLink l
-            where l.userId = :userId and l.direction = 'manager' and not l.deliveredToClient and l.cwMessageId <= :upTo
-            order by l.cwMessageId
+            where l.userId = :userId and l.direction = 'manager' and not l.deliveredToClient and l.externalCwId <= :upTo
+            order by l.externalCwId
             """)
     List<ChatMessageLink> undeliveredUpTo(@Param("userId") UUID userId, @Param("upTo") long upTo);
 

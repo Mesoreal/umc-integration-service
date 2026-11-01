@@ -106,8 +106,8 @@ class ChatwootPollsIT extends ChatConnectorTestBase {
     }
 
     private void link(long cwId, Instant createdAt) {
-        jdbc.update("INSERT INTO chatwoot.chat_message_link (cw_message_id, message_id, user_id, conversation_id, direction, "
-                + "cw_created_at) VALUES (?, ?, ?, 15, 'client', ?)", cwId, UUID.randomUUID(), user,
+        jdbc.update("INSERT INTO chatwoot.chat_message_link (cw_message_id, external_cw_id, message_id, user_id, conversation_id, "
+                + "direction, cw_created_at) VALUES (?, ?, ?, ?, 15, 'client', ?)", cwId, cwId, UUID.randomUUID(), user,
                 OffsetDateTime.ofInstant(createdAt, ZoneOffset.UTC));
     }
 }

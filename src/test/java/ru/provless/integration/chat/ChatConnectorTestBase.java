@@ -45,6 +45,13 @@ import static org.assertj.core.api.Assertions.assertThat;
         "chatwoot.chat.retry-max=200ms",
         // tests call the polls themselves
         "chatwoot.chat.poll-initial-delay=PT1H",
+        // departments of the tests, whatever application.yml names them
+        "chatwoot.chat.departments[0].key=sales",
+        "chatwoot.chat.departments[0].label=в-продажи",
+        "chatwoot.chat.departments[0].inbox-name=Приложение — продажи",
+        "chatwoot.chat.departments[1].key=umc",
+        "chatwoot.chat.departments[1].label=в-умц",
+        "chatwoot.chat.departments[1].inbox-name=Приложение — УМЦ",
         "chatwoot.chat-storage.access-key=k",
         "chatwoot.chat-storage.secret-key=s",
         "chatwoot.chat-storage.bucket=" + ChatConnectorTestBase.BUCKET
@@ -103,7 +110,8 @@ abstract class ChatConnectorTestBase {
                             + "\",\"webhook_url\":\"http://integration-service:8080/webhooks/chatwoot/app\","
                             + "\"working_hours_enabled\":false,\"timezone\":\"Europe/Moscow\",\"working_hours\":[]}")));
         }
-        jdbc.update("TRUNCATE chatwoot.chat_message_link, chatwoot.chat_conversation, chatwoot.chat_agent, chatwoot.chat_inbox_hours");
+        jdbc.update("TRUNCATE chatwoot.chat_message_link, chatwoot.chat_conversation, chatwoot.chat_agent, chatwoot.chat_inbox_hours, "
+                + "chatwoot.chat_transfer_copy");
     }
 
     static String s3Url() {

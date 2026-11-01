@@ -84,7 +84,7 @@ public class OrderedRetry {
         if (e instanceof DataIntegrityViolationException) {
             return Kind.UNKNOWN;
         }
-        if (e instanceof ChatwootDisabledException || e instanceof SdkClientException || e instanceof S3Exception
+        if (e instanceof TransferInProgressException || e instanceof ChatwootDisabledException || e instanceof SdkClientException || e instanceof S3Exception
                 || e instanceof AmqpException || e instanceof DataAccessException) {
             return Kind.TRANSIENT;
         }

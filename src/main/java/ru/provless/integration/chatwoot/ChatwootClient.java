@@ -242,6 +242,50 @@ public class ChatwootClient {
         return createMessage(conversationId, content, "outgoing", true, null, inReplyTo, List.of());
     }
 
+    /**
+     * A copy of a message in another conversation (a transfer to a department): incoming, outgoing or a note, as the
+     * original. {@code sourceId} marks it as the connector's, so its webhook is not taken for an agent's reply.
+     */
+    public ChatwootMessageRef createCopy(long conversationId, ChatwootMessage original, String content, String sourceId,
+                                         Long inReplyTo, List<ChatwootUpload> uploads) {
+        String type = original.type() == ChatwootMessage.INCOMING ? "incoming" : "outgoing";
+        return createMessage(conversationId, content, type, original.isPrivate(), sourceId, inReplyTo, uploads);
+    }
+
+    /** Every message of a conversation, oldest first (pages of 100 with {@code after}). */
+    public List<ChatwootMessage> allMessages(long conversationId) {
+        List<ChatwootMessage> all = new ArrayList<>();
+        long after = 0;
+        while (true) {
+            JsonNode page = call(HttpMethod.GET, "/conversations/" + conversationId + "/messages?after=" + after, null, false)
+                    .path("payload");
+            if (!page.isArray() || page.isEmpty()) {
+                return all;
+            }
+            for (JsonNode m : page) {
+                List<String> files = new ArrayList<>();
+                m.path("attachments").forEach(a -> files.add(a.path("data_url").asText()));
+                JsonNode sender = m.path("sender");
+                String senderName = textOrNull(sender, "available_name");
+                JsonNode inReplyTo = m.path("content_attributes").path("in_reply_to");
+                all.add(new ChatwootMessage(m.path("id").asLong(), m.path("message_type").asInt(),
+                        m.path("private").asBoolean(false), textOrNull(m, "content"), epochOrNull(m.path("created_at")),
+                        textOrNull(m, "source_id"), senderName != null ? senderName : textOrNull(sender, "name"),
+                        textOrNull(sender, "type"), inReplyTo.canConvertToLong() ? inReplyTo.asLong() : null,
+                        m.path("content_attributes").path("deleted").asBoolean(false), files));
+                after = Math.max(after, m.path("id").asLong());
+            }
+            if (page.size() < 100) {
+                return all;
+            }
+        }
+    }
+
+    /** Deletes a conversation with its messages (administrators only; Chatwoot does it in the background). */
+    public void deleteConversation(long conversationId) {
+        call(HttpMethod.DELETE, "/conversations/" + conversationId, null, true);
+    }
+
     /** {@code delivered} / {@code read} of an agent's message; API inboxes only, the status never goes back. */
     public void updateMessageStatus(long conversationId, long messageId, String status) {
         ObjectNode body = jsonMapper.createObjectNode();

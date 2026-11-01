@@ -221,8 +221,9 @@ class ChatOutboundIT extends ChatConnectorTestBase {
         outbound(created(UUID.randomUUID(), "привет"));
         receiveUntil(ChatQueues.INBOUND, b -> b.contains("cw:301"), 10_000);
         // two managers' messages the connector forwarded (step 3 writes these links)
-        jdbc.update("INSERT INTO chatwoot.chat_message_link (cw_message_id, user_id, conversation_id, direction, cw_created_at) "
-                + "VALUES (310, ?, 15, 'manager', now()), (311, ?, 15, 'manager', now()), (312, ?, 15, 'manager', now())",
+        jdbc.update("INSERT INTO chatwoot.chat_message_link (cw_message_id, external_cw_id, user_id, conversation_id, direction, "
+                + "cw_created_at) VALUES (310, 310, ?, 15, 'manager', now()), (311, 311, ?, 15, 'manager', now()), "
+                + "(312, 312, ?, 15, 'manager', now())",
                 user, user, user);
         chatwoot.stubFor(patch(urlPathEqualTo(ACCOUNT + "/conversations/15/messages/310")).willReturn(okJson("{}")));
         chatwoot.stubFor(patch(urlPathEqualTo(ACCOUNT + "/conversations/15/messages/311")).willReturn(okJson("{}")));

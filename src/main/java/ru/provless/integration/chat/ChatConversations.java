@@ -32,6 +32,9 @@ public class ChatConversations {
         Optional<ChatConversation> known = repository.findByUserIdAndCurrentTrue(userId);
         if (known.isPresent()) {
             ChatConversation conversation = known.get();
+            if (conversation.getTransferredTo() != null) {
+                throw new TransferInProgressException(conversation.getConversationId());
+            }
             Optional<ChatwootConversation> live = chatwoot.findConversation(conversation.getConversationId());
             if (live.isPresent() && !live.get().isResolved()) {
                 refresh(conversation, live.get());

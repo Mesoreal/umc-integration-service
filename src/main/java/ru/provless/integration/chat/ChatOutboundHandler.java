@@ -90,14 +90,17 @@ public class ChatOutboundHandler {
         inbound.send(new InboundEvents.ClientMessageDelivered(link.getUserId(), link.getMessageId(), link.externalId()));
     }
 
-    /** A quote works only inside one Chatwoot conversation; a quote of an earlier request is dropped. */
+    /**
+     * A quote works only inside one Chatwoot conversation; a quote of an earlier request is dropped. chat-service knows
+     * the message by its first Chatwoot id; after a transfer it lives on as a copy — the link knows where.
+     */
     private Long quoted(String externalId, long conversationId) {
         Long cwId = ChatMessageLink.cwId(externalId);
         if (cwId == null) {
             return null;
         }
-        return links.findById(cwId).filter(l -> l.getConversationId() == conversationId).map(ChatMessageLink::getCwMessageId)
-                .orElse(null);
+        return links.findByExternalCwId(cwId).filter(l -> l.getConversationId() == conversationId)
+                .map(ChatMessageLink::getCwMessageId).orElse(null);
     }
 
     /** Edits and deletions: a private note under the original (no editing through the API — decision 31.10.2026). */

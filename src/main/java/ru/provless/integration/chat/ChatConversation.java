@@ -47,6 +47,10 @@ public class ChatConversation {
     @Column(name = "agent_last_seen_at")
     private OffsetDateTime agentLastSeenAt;
 
+    /** Set when a transfer to a department starts; the user's messages wait until it is done. */
+    @Column(name = "transferred_to")
+    private Long transferredTo;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

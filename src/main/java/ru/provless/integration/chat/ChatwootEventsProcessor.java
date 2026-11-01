@@ -29,6 +29,9 @@ public class ChatwootEventsProcessor {
     private final ChatStorage storage;
     private final ChatInboundPublisher inbound;
     private final ChatwootPolls polls;
+    private final ChatDepartments departments;
+    private final ChatInboxes inboxes;
+    private final ChatTransfers transfers;
 
     public void process(JsonNode event) {
         String type = event.path("event").asText("");
@@ -120,6 +123,10 @@ public class ChatwootEventsProcessor {
         }
         long conversationId = conversation.path("id").asLong();
         ChatConversation known = track(conversationId, userId.get(), conversation);
+        if (ChatTransfers.isDone(known)) {
+            // a late event of a conversation that was moved (and deleted): nothing in it matters any more
+            return;
+        }
         String status = conversation.path("status").asText(known.getStatus());
         known.setStatus(status);
 
@@ -132,6 +139,24 @@ public class ChatwootEventsProcessor {
             inbound.send(new InboundEvents.ManagerChanged(userId.get(), assigneeId == null ? null : new InboundEvents.Manager(
                     InboundEvents.managerId(assigneeId), name(assignee), null, false,
                     presence(assignee.path("availability_status").asText("offline")), null)));
+        }
+        transferIfLabelled(known, conversation);
+    }
+
+    /**
+     * A department's label on the user's current request (or one whose transfer broke halfway) moves it to that
+     * department's inbox; the label of the department the request is already in means nothing.
+     */
+    private void transferIfLabelled(ChatConversation known, JsonNode conversation) {
+        if (!known.isCurrent() && known.getTransferredTo() == null) {
+            return;
+        }
+        for (JsonNode label : conversation.path("labels")) {
+            Optional<ChatDepartments.Department> department = departments.byLabel(label.asText(""));
+            if (department.isPresent() && inboxes.departmentInboxId(department.get()) != known.getInboxId()) {
+                transfers.transfer(known, department.get());
+                return;
+            }
         }
     }
 

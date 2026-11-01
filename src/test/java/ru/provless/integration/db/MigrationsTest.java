@@ -31,7 +31,7 @@ class MigrationsTest {
              ResultSet rs = c.createStatement().executeQuery(
                      "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'chatwoot' AND table_name LIKE 'chat_%'")) {
             rs.next();
-            assertThat(rs.getInt(1)).isEqualTo(4);
+            assertThat(rs.getInt(1)).isEqualTo(5);
         }
     }
 }
