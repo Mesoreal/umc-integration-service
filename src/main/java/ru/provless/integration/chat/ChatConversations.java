@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.provless.integration.chatwoot.AppContactService;
-import ru.provless.integration.chatwoot.ChatwootAppInbox;
 import ru.provless.integration.chatwoot.ChatwootClient;
 import ru.provless.integration.chatwoot.ChatwootConversation;
 
@@ -23,7 +22,7 @@ public class ChatConversations {
 
     private final ChatConversationRepository repository;
     private final ChatwootClient chatwoot;
-    private final ChatwootAppInbox appInbox;
+    private final ChatInboxes inboxes;
     private final AppContactService appContacts;
     private final ChatInboundPublisher inbound;
     private final ChatwootPolls polls;
@@ -44,7 +43,7 @@ public class ChatConversations {
         }
 
         long contactId = appContacts.ensure(userId, null);
-        ChatwootConversation created = chatwoot.createConversation(appInbox.id(), contactId, userId.toString());
+        ChatwootConversation created = chatwoot.createConversation(inboxes.intakeId(), contactId, userId.toString());
         ChatConversation conversation = new ChatConversation(created.id(), userId, contactId, created.inboxId(),
                 created.status());
         refresh(conversation, created);

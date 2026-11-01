@@ -43,10 +43,15 @@ public class ChatwootEventsProcessor {
 
     // ─── messages ───────────────────────────────────────────────────────────
 
-    /** Only what an agent wrote to the user: outgoing, not a note, sent by a user (not a bot, not an automation). */
+    /**
+     * Only what an agent wrote to the user: outgoing, not a note, sent by a user (not a bot, not an automation), and
+     * typed in Chatwoot — no {@code source_id}. Messages the connector posts itself (copies made by a transfer to a
+     * department) carry one and are not sent to the app again.
+     */
     private void messageCreated(JsonNode m) {
         if (!"outgoing".equals(m.path("message_type").asText()) || m.path("private").asBoolean(false)
-                || !"user".equals(m.path("sender").path("type").asText())) {
+                || !"user".equals(m.path("sender").path("type").asText())
+                || !m.path("source_id").asText("").isEmpty()) {
             return;
         }
         long cwId = m.path("id").asLong();

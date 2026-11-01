@@ -91,6 +91,18 @@ abstract class ChatConnectorTestBase {
     @BeforeEach
     void resetChatwoot() {
         chatwoot.resetAll();
+        // the department inboxes (application.yml): «продажи» = 6, «УМЦ» = 7; «Входящие» = 5 (chatwoot.app-inbox-id)
+        chatwoot.stubFor(com.github.tomakehurst.wiremock.client.WireMock.get(ACCOUNT + "/inboxes").willReturn(
+                com.github.tomakehurst.wiremock.client.WireMock.okJson("""
+                        {"payload":[{"id":5,"name":"Приложение — входящие"},{"id":6,"name":"Приложение — продажи"},
+                                    {"id":7,"name":"Приложение — УМЦ"}]}""")));
+        for (int inbox : new int[]{6, 7}) {
+            chatwoot.stubFor(com.github.tomakehurst.wiremock.client.WireMock.get(ACCOUNT + "/inboxes/" + inbox).willReturn(
+                    com.github.tomakehurst.wiremock.client.WireMock.okJson("{\"id\":" + inbox
+                            + ",\"inbox_identifier\":\"dept" + inbox + "\",\"secret\":\"secret" + inbox
+                            + "\",\"webhook_url\":\"http://integration-service:8080/webhooks/chatwoot/app\","
+                            + "\"working_hours_enabled\":false,\"timezone\":\"Europe/Moscow\",\"working_hours\":[]}")));
+        }
         jdbc.update("TRUNCATE chatwoot.chat_message_link, chatwoot.chat_conversation, chatwoot.chat_agent, chatwoot.chat_inbox_hours");
     }
 

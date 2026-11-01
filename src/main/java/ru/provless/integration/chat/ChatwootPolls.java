@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import ru.provless.integration.chatwoot.ChatwootAgent;
-import ru.provless.integration.chatwoot.ChatwootAppInbox;
 import ru.provless.integration.chatwoot.ChatwootClient;
 import ru.provless.integration.chatwoot.ChatwootConversation;
 import ru.provless.integration.chatwoot.ChatwootInboxSettings;
@@ -37,7 +36,7 @@ public class ChatwootPolls {
     static final long SEEN_ROUNDING_MS = 999;
 
     private final ChatwootClient chatwoot;
-    private final ChatwootAppInbox appInbox;
+    private final ChatInboxes inboxes;
     private final ChatConversationRepository conversations;
     private final ChatMessageLinkRepository links;
     private final ChatAgentRepository agents;
@@ -46,11 +45,11 @@ public class ChatwootPolls {
     private final boolean enabled;
     private final Clock clock;
 
-    public ChatwootPolls(ChatwootClient chatwoot, ChatwootAppInbox appInbox, ChatConversationRepository conversations,
+    public ChatwootPolls(ChatwootClient chatwoot, ChatInboxes inboxes, ChatConversationRepository conversations,
                          ChatMessageLinkRepository links, ChatAgentRepository agents, ChatInboxHoursRepository inboxHours,
                          ChatInboundPublisher inbound, @Value("${chatwoot.enabled:false}") boolean enabled) {
         this.chatwoot = chatwoot;
-        this.appInbox = appInbox;
+        this.inboxes = inboxes;
         this.conversations = conversations;
         this.links = links;
         this.agents = agents;
@@ -135,21 +134,27 @@ public class ChatwootPolls {
             return;
         }
         try {
-            long inboxId = appInbox.id();
-            ChatwootInboxSettings settings = chatwoot.inboxSettings(inboxId);
-            InboundEvents.WorkingHoursChanged hours = hours(null, settings);
-            String hash = hash(hours);
-            if (inboxHours.findById(inboxId).map(h -> h.getHoursHash().equals(hash)).orElse(false)) {
-                return;
+            for (long inboxId : inboxes.all()) {
+                pollHours(inboxId);
             }
-            for (UUID userId : conversations.currentUsersOfInbox(inboxId)) {
-                inbound.send(hours(userId, settings));
-            }
-            inboxHours.save(new ChatInboxHours(inboxId, hash));
-            log.info("Working hours of inbox {} changed, sent to its users", inboxId);
         } catch (RuntimeException e) {
             log.warn("Working hours poll failed: {}", e.getMessage());
         }
+    }
+
+    /** Each inbox has its own hours (a department's); users get those of their current request's inbox. */
+    private void pollHours(long inboxId) {
+        ChatwootInboxSettings settings = chatwoot.inboxSettings(inboxId);
+        InboundEvents.WorkingHoursChanged hours = hours(null, settings);
+        String hash = hash(hours);
+        if (inboxHours.findById(inboxId).map(h -> h.getHoursHash().equals(hash)).orElse(false)) {
+            return;
+        }
+        for (UUID userId : conversations.currentUsersOfInbox(inboxId)) {
+            inbound.send(hours(userId, settings));
+        }
+        inboxHours.save(new ChatInboxHours(inboxId, hash));
+        log.info("Working hours of inbox {} changed, sent to its users", inboxId);
     }
 
     /**

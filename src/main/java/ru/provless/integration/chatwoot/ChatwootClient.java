@@ -178,6 +178,12 @@ public class ChatwootClient {
         return call(HttpMethod.POST, "/inboxes", body, false).path("id").asLong();
     }
 
+    public void renameInbox(long inboxId, String name) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        body.put("name", name);
+        call(HttpMethod.PATCH, "/inboxes/" + inboxId, body, false);
+    }
+
     /** Sets the inbox's webhook (API channel); the connector points it at itself on start. */
     public void setInboxWebhook(long inboxId, String webhookUrl) {
         ObjectNode body = jsonMapper.createObjectNode();

@@ -6,8 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * The «Приложение» inbox — the app is one more channel of a Chatwoot contact, next to the
- * messenger bridges' inboxes. Taken from config if set, otherwise found by name or created once.
+ * «Приложение — входящие» — the inbox new app requests arrive in (plan-chat-departments.md); the app is one more channel
+ * of a Chatwoot contact, next to the messenger bridges' inboxes. Taken from config if set, otherwise found by name; an
+ * inbox still under the old name «Приложение» is renamed (history and contacts stay); created once if there is none.
  */
 @Slf4j
 @Component
@@ -21,6 +22,10 @@ public class ChatwootAppInbox {
 
     @Value("${chatwoot.app-inbox-id:}")
     private String configuredInboxId;
+
+    /** The name before departments (31.10.2026): such an inbox is renamed to {@link #inboxName}. */
+    @Value("${chatwoot.app-inbox-legacy-name:}")
+    private String legacyName;
 
     private volatile Long inboxId;
     private volatile String identifier;
@@ -52,40 +57,21 @@ public class ChatwootAppInbox {
         }
     }
 
-    private volatile String webhookSecret;
-
-    /** The secret Chatwoot signs this inbox's webhook with; {@code refresh} — read it again (rotated in Chatwoot). */
-    public String webhookSecret(boolean refresh) {
-        String cached = webhookSecret;
-        if (cached != null && !refresh) {
-            return cached;
-        }
-        synchronized (this) {
-            webhookSecret = chatwootClient.inboxSettings(id()).secret();
-            return webhookSecret;
-        }
-    }
-
-    /** Points the inbox's webhook at {@code url} unless it already is; true when it had to change it. */
-    public boolean ensureWebhook(String url) {
-        ChatwootInboxSettings settings = chatwootClient.inboxSettings(id());
-        webhookSecret = settings.secret();
-        if (url.equals(settings.webhookUrl())) {
-            return false;
-        }
-        chatwootClient.setInboxWebhook(id(), url);
-        log.info("Chatwoot app inbox {} webhook set to {} (was {})", id(), url, settings.webhookUrl());
-        return true;
-    }
-
     private long resolve() {
         if (configuredInboxId != null && !configuredInboxId.isBlank()) {
             return Long.parseLong(configuredInboxId.trim());
         }
-        return chatwootClient.findInboxIdByName(inboxName).orElseGet(() -> {
-            long created = chatwootClient.createApiInbox(inboxName);
-            log.info("Created Chatwoot app inbox '{}' id={}", inboxName, created);
-            return created;
-        });
+        return chatwootClient.findInboxIdByName(inboxName)
+                .or(() -> legacyName == null || legacyName.isBlank() ? java.util.Optional.empty()
+                        : chatwootClient.findInboxIdByName(legacyName).map(id -> {
+                            chatwootClient.renameInbox(id, inboxName);
+                            log.info("Chatwoot app inbox {} renamed '{}' → '{}'", id, legacyName, inboxName);
+                            return id;
+                        }))
+                .orElseGet(() -> {
+                    long created = chatwootClient.createApiInbox(inboxName);
+                    log.info("Created Chatwoot app inbox '{}' id={}", inboxName, created);
+                    return created;
+                });
     }
 }

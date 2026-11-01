@@ -2,6 +2,7 @@ package ru.provless.integration.chat;
 
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
  * the listeners retry and set aside events themselves; anything that still escapes is put back in the queue.
  */
 @Configuration
+@EnableConfigurationProperties(ChatDepartments.class)
 public class ChatListenerConfig {
 
     public static final String ORDERED = "chatOrderedListenerFactory";

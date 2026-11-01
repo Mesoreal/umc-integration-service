@@ -3,7 +3,6 @@ package ru.provless.integration.chat;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import ru.provless.integration.chatwoot.ChatwootAppInbox;
 import ru.provless.integration.chatwoot.ChatwootClient;
 import ru.provless.integration.chatwoot.ChatwootUpload;
 
@@ -28,7 +27,7 @@ public class ChatOutboundHandler {
     private final ChatConversations conversations;
     private final ChatMessageLinkRepository links;
     private final ChatwootClient chatwoot;
-    private final ChatwootAppInbox appInbox;
+    private final ChatInboxes inboxes;
     private final ChatStorage storage;
     private final ChatInboundPublisher inbound;
 
@@ -117,7 +116,7 @@ public class ChatOutboundHandler {
      */
     private void read(OutboundEvent event) {
         conversations.existing(event.userId()).ifPresent(c ->
-                chatwoot.markSeenByContact(appInbox.identifier(), event.userId().toString(), c.getConversationId()));
+                chatwoot.markSeenByContact(inboxes.identifier(c.getInboxId()), event.userId().toString(), c.getConversationId()));
         markDelivered(event, false);
     }
 
@@ -140,7 +139,7 @@ public class ChatOutboundHandler {
     }
 
     private void typing(OutboundEvent event) {
-        conversations.existing(event.userId()).ifPresent(c -> chatwoot.setContactTyping(appInbox.identifier(),
+        conversations.existing(event.userId()).ifPresent(c -> chatwoot.setContactTyping(inboxes.identifier(c.getInboxId()),
                 event.userId().toString(), c.getConversationId(), Boolean.TRUE.equals(event.isTyping())));
     }
 }

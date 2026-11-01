@@ -116,11 +116,22 @@ chatwoot:
   account-id: ${CHATWOOT_ACCOUNT_ID:}
   # Токен отдельного сервисного пользователя-администратора Chatwoot, не личный.
   api-token: ${CHATWOOT_API_TOKEN:}
-  app-inbox-name: ${CHATWOOT_APP_INBOX_NAME:Приложение}
+  app-inbox-name: ${CHATWOOT_APP_INBOX_NAME:Приложение — входящие}
+  # The inbox's name before departments: found under it, it is renamed to app-inbox-name.
+  app-inbox-legacy-name: Приложение
   # Пусто — найти inbox по имени или создать.
   app-inbox-id: ${CHATWOOT_APP_INBOX_ID:}
   # App chat connector (docs/backend/artifacts/messenger/plan-chat-connector.md): chat.outbound ↔ Chatwoot ↔ chat.inbound.
   chat:
+    # Departments (plan-chat-departments.md): a label on a request moves it to the department's inbox. Inboxes are found by
+    # name or created; who is in them is set in Chatwoot. Labels are lowercase (Chatwoot stores them so).
+    departments:
+      - key: sales
+        label: для продаж
+        inbox-name: Продажи - Приложение
+      - key: umc
+        label: для умц
+        inbox-name: УМЦ - Приложение
     # Where Chatwoot sends the app inbox's webhook. Inside the cluster: Chatwoot already reaches in-cluster Services
     # (SAFE_FETCH_ALLOW_PRIVATE_NETWORK=true for the bridges); the path is not published by Traefik.
     webhook-url: ${CHATWOOT_CHAT_WEBHOOK_URL:http://integration-service:8080/webhooks/chatwoot/app}

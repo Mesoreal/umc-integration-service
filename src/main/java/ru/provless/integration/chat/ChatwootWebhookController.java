@@ -12,7 +12,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
-import ru.provless.integration.chatwoot.ChatwootAppInbox;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -23,8 +24,9 @@ import java.time.Duration;
 import java.util.HexFormat;
 
 /**
- * The app inbox's webhook (plan-chat-connector.md §2.2). Reached only inside the cluster (no Traefik route). Checks
- * Chatwoot's signature — {@code X-Chatwoot-Signature: sha256=HMAC(inbox secret, "<timestamp>.<body>")} — and the age
+ * The webhook of the app's inboxes (plan-chat-connector.md §2.2, departments — plan-chat-departments.md). Reached only
+ * inside the cluster (no Traefik route). Checks Chatwoot's signature with the secret of the inbox the event is from —
+ * {@code X-Chatwoot-Signature: sha256=HMAC(inbox secret, "<timestamp>.<body>")} — and the age
  * of {@code X-Chatwoot-Timestamp}, then queues the body as is and answers at once: Chatwoot waits only seconds,
  * fetching attachments takes longer.
  */
@@ -32,19 +34,20 @@ import java.util.HexFormat;
 @RestController
 public class ChatwootWebhookController {
 
-    private final ChatwootAppInbox appInbox;
+    private final ChatInboxes inboxes;
+    private final ObjectMapper json = new ObjectMapper();
     private final RabbitTemplate rabbit;
     private final Duration maxAge;
     private final Clock clock;
 
     @Autowired
-    public ChatwootWebhookController(ChatwootAppInbox appInbox, RabbitTemplate rabbit,
+    public ChatwootWebhookController(ChatInboxes inboxes, RabbitTemplate rabbit,
                                      @Value("${chatwoot.chat.webhook-max-age}") Duration maxAge) {
-        this(appInbox, rabbit, maxAge, Clock.systemUTC());
+        this(inboxes, rabbit, maxAge, Clock.systemUTC());
     }
 
-    ChatwootWebhookController(ChatwootAppInbox appInbox, RabbitTemplate rabbit, Duration maxAge, Clock clock) {
-        this.appInbox = appInbox;
+    ChatwootWebhookController(ChatInboxes inboxes, RabbitTemplate rabbit, Duration maxAge, Clock clock) {
+        this.inboxes = inboxes;
         this.rabbit = rabbit;
         this.maxAge = maxAge;
         this.clock = clock;
@@ -58,9 +61,14 @@ public class ChatwootWebhookController {
             log.warn("Chatwoot app webhook refused: signature or timestamp missing or stale");
             return ResponseEntity.status(401).build();
         }
-        // a rotated secret: read it again once before refusing
-        if (!signed(body, timestamp, signature, appInbox.webhookSecret(false))
-                && !signed(body, timestamp, signature, appInbox.webhookSecret(true))) {
+        // each app inbox signs with its own secret: the one named in the body; a rotated secret is read again once
+        Long inboxId = inboxOf(body);
+        if (inboxId == null || !inboxes.all().contains(inboxId)) {
+            log.warn("Chatwoot app webhook refused: not an app inbox ({})", inboxId);
+            return ResponseEntity.status(401).build();
+        }
+        if (!signed(body, timestamp, signature, inboxes.secret(inboxId, false))
+                && !signed(body, timestamp, signature, inboxes.secret(inboxId, true))) {
             log.warn("Chatwoot app webhook refused: bad signature");
             return ResponseEntity.status(401).build();
         }
@@ -69,6 +77,22 @@ public class ChatwootWebhookController {
         props.setDeliveryMode(MessageDeliveryMode.PERSISTENT);
         rabbit.send("", ChatQueues.WEBHOOK_EVENTS, new Message(body, props));
         return ResponseEntity.ok().build();
+    }
+
+    /** Where Chatwoot puts the inbox: {@code inbox.id} (messages), {@code inbox_id} (conversations), {@code conversation.inbox_id} (typing). */
+    private Long inboxOf(byte[] body) {
+        try {
+            JsonNode event = json.readTree(body);
+            for (JsonNode id : new JsonNode[]{event.path("inbox").path("id"), event.path("inbox_id"),
+                    event.path("conversation").path("inbox_id")}) {
+                if (id.canConvertToLong() && id.asLong() > 0) {
+                    return id.asLong();
+                }
+            }
+            return null;
+        } catch (java.io.IOException e) {
+            return null;
+        }
     }
 
     private boolean fresh(String timestamp) {
