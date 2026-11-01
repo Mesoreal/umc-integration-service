@@ -26,6 +26,7 @@ public class ChatConversations {
     private final ChatwootAppInbox appInbox;
     private final AppContactService appContacts;
     private final ChatInboundPublisher inbound;
+    private final ChatwootPolls polls;
 
     /** The conversation to put the user's message into, created when there is none or the last one is resolved. */
     public ChatConversation current(UUID userId) {
@@ -51,6 +52,7 @@ public class ChatConversations {
         log.info("Chat conversation {} started for userId={} (contact {})", created.id(), userId, contactId);
         // a new request has nobody on it yet: the app shows «Ваш менеджер» instead of the previous one
         inbound.send(new InboundEvents.ManagerChanged(userId, null));
+        polls.sendHours(userId, created.inboxId());
         return conversation;
     }
 

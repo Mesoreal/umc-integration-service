@@ -129,9 +129,11 @@ chatwoot:
     # Retry pause while Chatwoot is down: doubles from the first to the max, forever (the queue waits, order kept).
     retry-initial: 2s
     retry-max: 60s
-    read-poll-interval: 5s
-    agents-poll-interval: 30s
-    hours-poll-interval: 10m
+    # Polls (Chatwoot sends no events for these), ISO-8601: what @Scheduled reads. The first runs after the delay.
+    poll-initial-delay: PT15S
+    read-poll-interval: PT5S
+    agents-poll-interval: PT30S
+    hours-poll-interval: PT10M
   # The chat-service attachment bucket (the same one Chatwoot writes to), shared Yandex Object Storage key.
   chat-storage:
     endpoint: ${AWS_S3_ENDPOINT:https://storage.yandexcloud.net}

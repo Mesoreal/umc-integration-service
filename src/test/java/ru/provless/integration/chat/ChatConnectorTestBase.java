@@ -43,6 +43,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "chatwoot.app-inbox-id=5",
         "chatwoot.chat.retry-initial=100ms",
         "chatwoot.chat.retry-max=200ms",
+        // tests call the polls themselves
+        "chatwoot.chat.poll-initial-delay=PT1H",
         "chatwoot.chat-storage.access-key=k",
         "chatwoot.chat-storage.secret-key=s",
         "chatwoot.chat-storage.bucket=" + ChatConnectorTestBase.BUCKET

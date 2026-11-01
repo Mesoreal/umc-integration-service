@@ -5,6 +5,7 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,6 +37,7 @@ public class ChatwootWebhookController {
     private final Duration maxAge;
     private final Clock clock;
 
+    @Autowired
     public ChatwootWebhookController(ChatwootAppInbox appInbox, RabbitTemplate rabbit,
                                      @Value("${chatwoot.chat.webhook-max-age}") Duration maxAge) {
         this(appInbox, rabbit, maxAge, Clock.systemUTC());
