@@ -110,6 +110,37 @@ public class ChatwootClient {
         return Optional.empty();
     }
 
+    /** Inboxes the contact has a channel in (its contact_inboxes); empty when the contact is gone. */
+    public List<Long> contactInboxIds(long contactId) {
+        JsonNode json = call(HttpMethod.GET, "/contacts/" + contactId, null, true);
+        List<Long> ids = new ArrayList<>();
+        if (json != null) {
+            json.path("payload").path("contact_inboxes").forEach(ci -> ids.add(ci.path("inbox").path("id").asLong()));
+        }
+        return ids;
+    }
+
+    /** The contact's latest conversations (one page of 25): {@code [id, inbox_id]} each. */
+    public List<long[]> contactConversations(long contactId) {
+        JsonNode json = call(HttpMethod.GET, "/contacts/" + contactId + "/conversations", null, true);
+        List<long[]> conversations = new ArrayList<>();
+        if (json != null) {
+            json.path("payload").forEach(c -> conversations.add(new long[]{c.path("id").asLong(), c.path("inbox_id").asLong()}));
+        }
+        return conversations;
+    }
+
+    /** Deletes the contact with all its conversations (administrators only). A missing contact is fine. */
+    public void deleteContact(long contactId) {
+        call(HttpMethod.DELETE, "/contacts/" + contactId, null, true);
+    }
+
+    public void removeContactAttributes(long contactId, List<String> keys) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        keys.forEach(body.putArray("custom_attributes")::add);
+        call(HttpMethod.POST, "/contacts/" + contactId + "/destroy_custom_attributes", body, true);
+    }
+
     /** Creates the contact together with its contact_inbox ({@code inboxId}, {@code sourceId}). */
     public ChatwootContact createContact(String name, String phone, String identifier,
                                          Map<String, Object> customAttributes, long inboxId, String sourceId) {
