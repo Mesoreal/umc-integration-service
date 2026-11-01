@@ -134,13 +134,13 @@ chatwoot:
     read-poll-interval: PT5S
     agents-poll-interval: PT30S
     hours-poll-interval: PT10M
-  # The chat-service attachment bucket (the same one Chatwoot writes to), shared Yandex Object Storage key.
+  # The chat-service attachment bucket — Chatwoot's bucket, with Chatwoot's key (chatwoot-secrets STORAGE_*).
   chat-storage:
-    endpoint: ${AWS_S3_ENDPOINT:https://storage.yandexcloud.net}
-    region: ${AWS_REGION:ru-central1}
+    endpoint: ${CHAT_S3_ENDPOINT:https://storage.yandexcloud.net}
+    region: ${CHAT_S3_REGION:ru-central1}
     bucket: ${CHAT_S3_BUCKET:chatwoot-mesoreal-app}
     prefix: ${CHAT_S3_PREFIX:app-chat/}
-    access-key: ${AWS_ACCESS_KEY_ID:}
-    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    access-key: ${CHAT_S3_ACCESS_KEY:}
+    secret-key: ${CHAT_S3_SECRET_KEY:}
   connect-timeout-ms: 2000
   read-timeout-ms: 10000
