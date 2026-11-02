@@ -99,6 +99,7 @@ public class PersonalManagerSync {
         try {
             Map<Long, DirectusManager> wanted = agentsOfDepartments();
             Map<Long, DirectusManager> known = directus.managers();
+            log.debug("Managers sync: {} agents in the department inboxes, {} in Directus", wanted.size(), known.size());
             for (DirectusManager manager : wanted.values()) {
                 DirectusManager was = known.get(manager.id());
                 if (was == null) {
@@ -155,6 +156,7 @@ public class PersonalManagerSync {
         }
         Map<UUID, PersonalManager> known = new HashMap<>();
         assignments.findAll().forEach(pm -> known.put(pm.getDirectusId(), pm));
+        log.debug("Personal managers sync: {} rows in Directus, {} known", rows.size(), known.size());
         for (ClientManagerRow row : rows) {
             PersonalManager pm = known.remove(row.id());
             if (row.phone() == null) {
