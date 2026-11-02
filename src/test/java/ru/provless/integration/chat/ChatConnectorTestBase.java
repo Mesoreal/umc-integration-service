@@ -56,10 +56,10 @@ import static org.assertj.core.api.Assertions.assertThat;
         "chatwoot.chat-storage.secret-key=s",
         "chatwoot.chat-storage.bucket=" + ChatConnectorTestBase.BUCKET
 })
-abstract class ChatConnectorTestBase {
+public abstract class ChatConnectorTestBase {
 
     static final String BUCKET = "chat-test";
-    static final String ACCOUNT = "/api/v1/accounts/1";
+    protected static final String ACCOUNT = "/api/v1/accounts/1";
 
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.9-alpine3.23");
@@ -71,7 +71,7 @@ abstract class ChatConnectorTestBase {
             .withExposedPorts(9090)
             .withEnv("COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS", BUCKET);
 
-    static WireMockServer chatwoot = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+    protected static WireMockServer chatwoot = new WireMockServer(WireMockConfiguration.options().dynamicPort());
 
     static {
         postgres.start();
@@ -92,7 +92,7 @@ abstract class ChatConnectorTestBase {
     @Autowired
     RabbitTemplate rabbit;
     @Autowired
-    JdbcTemplate jdbc;
+    protected JdbcTemplate jdbc;
 
     /** Every test starts from an empty Chatwoot stub and empty connector tables (the stubs reuse Chatwoot ids). */
     @BeforeEach
@@ -136,7 +136,7 @@ abstract class ChatConnectorTestBase {
     }
 
     /** Messages of {@code queue} until one matches; the others are returned too, in order (assert on what came). */
-    List<String> receiveUntil(String queue, Predicate<String> last, long timeoutMs) {
+    protected List<String> receiveUntil(String queue, Predicate<String> last, long timeoutMs) {
         List<String> got = new ArrayList<>();
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
@@ -154,7 +154,7 @@ abstract class ChatConnectorTestBase {
         return got;
     }
 
-    void drain(String queue) {
+    protected void drain(String queue) {
         while (rabbit.receive(queue, 200) != null) {
             // left from an earlier test
         }

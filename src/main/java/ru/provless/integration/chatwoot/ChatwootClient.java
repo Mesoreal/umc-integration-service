@@ -183,6 +183,29 @@ public class ChatwootClient {
         return json == null ? Optional.empty() : Optional.of(json.path("id").asLong());
     }
 
+    /** Whether the account has a contact attribute with this key (only defined ones are shown in the contact panel). */
+    public boolean contactAttributeDefined(String key) {
+        for (JsonNode definition : call(HttpMethod.GET, "/custom_attribute_definitions?attribute_model=contact_attribute",
+                null, false)) {
+            if (key.equals(definition.path("attribute_key").asText(null))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A text attribute of contacts. */
+    public void defineContactAttribute(String key, String displayName, String description) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        ObjectNode definition = body.putObject("custom_attribute_definition");
+        definition.put("attribute_key", key);
+        definition.put("attribute_display_name", displayName);
+        definition.put("attribute_description", description);
+        definition.put("attribute_display_type", "text");
+        definition.put("attribute_model", "contact_attribute");
+        call(HttpMethod.POST, "/custom_attribute_definitions", body, false);
+    }
+
     // ─── Inboxes ────────────────────────────────────────────────────────────
 
     /** The channel identifier of an API inbox — the key of its public API. */
@@ -392,9 +415,20 @@ public class ChatwootClient {
         for (JsonNode agent : call(HttpMethod.GET, "/agents", null, false)) {
             String name = textOrNull(agent, "available_name");
             agents.add(new ChatwootAgent(agent.path("id").asLong(), name != null ? name : textOrNull(agent, "name"),
-                    agent.path("availability_status").asText("offline")));
+                    agent.path("availability_status").asText("offline"), textOrNull(agent, "thumbnail")));
         }
         return agents;
+    }
+
+    /** Agents of the inbox (its members; administrators see every inbox but are members only where added). */
+    public List<ChatwootInboxMember> inboxMembers(long inboxId) {
+        List<ChatwootInboxMember> members = new ArrayList<>();
+        for (JsonNode agent : call(HttpMethod.GET, "/inbox_members/" + inboxId, null, false).path("payload")) {
+            String name = textOrNull(agent, "available_name");
+            members.add(new ChatwootInboxMember(agent.path("id").asLong(), name != null ? name : textOrNull(agent, "name"),
+                    textOrNull(agent, "email"), textOrNull(agent, "thumbnail")));
+        }
+        return members;
     }
 
     // ─── Public API of the app inbox (acts as the contact) ──────────────────

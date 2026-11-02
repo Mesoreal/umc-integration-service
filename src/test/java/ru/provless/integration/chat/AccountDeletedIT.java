@@ -58,7 +58,7 @@ class AccountDeletedIT extends ChatConnectorTestBase {
         chatwoot.verify(0, deleteRequestedFor(urlEqualTo(ACCOUNT + "/conversations/9")));
         chatwoot.verify(0, deleteRequestedFor(urlEqualTo(ACCOUNT + "/contacts/42")));
         chatwoot.verify(postRequestedFor(urlEqualTo(ACCOUNT + "/contacts/42/destroy_custom_attributes"))
-                .withRequestBody(equalToJson("{\"custom_attributes\":[\"app_user_id\"]}")));
+                .withRequestBody(equalToJson("{\"custom_attributes\":[\"app_user_id\",\"personal_manager\"]}")));
         assertGoneHere();
     }
 

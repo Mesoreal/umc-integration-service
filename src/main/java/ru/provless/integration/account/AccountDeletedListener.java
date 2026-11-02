@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 import ru.provless.integration.chat.ChatInboxes;
 import ru.provless.integration.chatwoot.ChatwootClient;
+import ru.provless.integration.manager.DirectusClient;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,9 +22,11 @@ import java.util.stream.Collectors;
 /**
  * Account deleted (BE-15). Chatwoot first (owner's decision 1 of account-deletion/plan.md): the app's conversations of
  * the contact go; the contact goes too when the app was its only channel, otherwise — the person also writes in a
- * messenger — it stays without {@code app_user_id}. Then this service's records: the contact link, the chat connector's
- * tables, the UMC document reviews (their files are profile-service's, deleted there). amoCRM deals stay (decision 2).
- * Chatwoot before the records: a retry still knows the contact. Twice is harmless.
+ * messenger — it stays without {@code app_user_id} and the personal manager. The client's row of Directus «Персональные
+ * менеджеры клиентов» (it holds the phone) goes too. Then this service's records: the contact link, the chat connector's
+ * tables, the personal manager (its journal stays, without a phone), the UMC document reviews (their files are
+ * profile-service's, deleted there). amoCRM deals stay (decision 2).
+ * Chatwoot and Directus before the records: a retry still knows the contact and the row. Twice is harmless.
  */
 @Slf4j
 @Component
@@ -35,15 +38,17 @@ public class AccountDeletedListener {
     private final TransactionTemplate tx;
     private final ChatwootClient chatwoot;
     private final ChatInboxes inboxes;
+    private final DirectusClient directus;
     private final boolean chatwootEnabled;
     private final ObjectMapper json = new ObjectMapper();
 
     public AccountDeletedListener(JdbcTemplate jdbc, TransactionTemplate tx, ChatwootClient chatwoot, ChatInboxes inboxes,
-                                  @Value("${chatwoot.enabled:false}") boolean chatwootEnabled) {
+                                  DirectusClient directus, @Value("${chatwoot.enabled:false}") boolean chatwootEnabled) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.chatwoot = chatwoot;
         this.inboxes = inboxes;
+        this.directus = directus;
         this.chatwootEnabled = chatwootEnabled;
     }
 
@@ -58,12 +63,21 @@ public class AccountDeletedListener {
         if (chatwootEnabled) {
             contactOf(userId).ifPresent(contact -> cleanChatwoot(userId, contact));
         }
+        List<UUID> rows = jdbc.queryForList("SELECT directus_id FROM chatwoot.personal_manager WHERE user_id = ?", UUID.class,
+                userId);
+        if (directus.enabled()) {
+            rows.forEach(directus::deleteClientManager);
+        }
         tx.executeWithoutResult(status -> {
             jdbc.update("DELETE FROM chatwoot.chat_message_link WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM chatwoot.chat_transfer_copy WHERE new_conversation_id IN "
                     + "(SELECT conversation_id FROM chatwoot.chat_conversation WHERE user_id = ?)", userId);
             jdbc.update("DELETE FROM chatwoot.chat_conversation WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM chatwoot.app_contact_link WHERE user_id = ?", userId);
+            jdbc.update("INSERT INTO chatwoot.personal_manager_history (directus_id, user_id, assigned_by, assigned_at) "
+                    + "SELECT directus_id, user_id, 'аккаунт удалён', now() FROM chatwoot.personal_manager "
+                    + "WHERE user_id = ? AND agent_id IS NOT NULL", userId);
+            jdbc.update("DELETE FROM chatwoot.personal_manager WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM umc.document_review WHERE user_id = ?", userId);
         });
         log.info("Account {} deleted", userId);
@@ -95,7 +109,7 @@ public class AccountDeletedListener {
         if (onlyApp) {
             chatwoot.deleteContact(contact);
         } else {
-            chatwoot.removeContactAttributes(contact, List.of("app_user_id"));
+            chatwoot.removeContactAttributes(contact, List.of("app_user_id", "personal_manager"));
         }
         log.info("Chatwoot of userId={}: contact {} {}, app conversations deleted={}", userId, contact,
                 onlyApp ? "deleted" : "kept (other channels)", deleted.size());

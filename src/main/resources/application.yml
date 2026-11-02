@@ -155,3 +155,22 @@ chatwoot:
     secret-key: ${CHAT_S3_SECRET_KEY:}
   connect-timeout-ms: 2000
   read-timeout-ms: 10000
+
+# auth-service internal API (X-Internal-Auth = internal.api-key): account by phone, for personal managers.
+auth-service:
+  base-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+  connect-timeout-ms: 2000
+  read-timeout-ms: 5000
+
+# Directus (CMS): personal managers (docs/backend/artifacts/personal-manager/plan.md). The collections, the policy and the
+# service user — tools/directus_personal_managers.py; its token is a secret. Empty url or token — the sync is off.
+directus:
+  url: ${DIRECTUS_URL:}
+  token: ${INTEGRATION_DIRECTUS_TOKEN:}
+  # The service user's login: its own writes into a row are not taken for an assignment.
+  service-email: integration-service@mesoreal.ru
+
+personal-manager:
+  poll-initial-delay: PT30S
+  managers-poll-interval: PT5M
+  assignments-poll-interval: PT1M

@@ -10,7 +10,10 @@ import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
-/** An agent's presence as last reported to chat-service; {@code lastSeenAt} — the last poll that saw them online. */
+/**
+ * An agent's presence as last reported to chat-service; {@code lastSeenAt} — the last poll that saw them online. Name and
+ * photo — for the chat header when the agent is shown without a Chatwoot event (the personal manager).
+ */
 @Entity
 @Table(schema = "chatwoot", name = "chat_agent")
 @Getter
@@ -27,6 +30,11 @@ public class ChatAgent {
 
     @Column(name = "last_seen_at")
     private OffsetDateTime lastSeenAt;
+
+    private String name;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
 
     public ChatAgent(long agentId, String availability) {
         this.agentId = agentId;

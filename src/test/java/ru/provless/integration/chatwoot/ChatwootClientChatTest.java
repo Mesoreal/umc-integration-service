@@ -144,12 +144,13 @@ class ChatwootClientChatTest {
     @Test
     void agents() {
         chatwoot.stubFor(get(ACCOUNT + "/agents").willReturn(okJson("""
-                [{"id":7,"name":"Anna Ivanova","available_name":"Анна","availability_status":"online","role":"agent"},
+                [{"id":7,"name":"Anna Ivanova","available_name":"Анна","availability_status":"online","role":"agent",
+                  "thumbnail":"https://cw/7.png"},
                  {"id":8,"name":"Oleg","available_name":null,"availability_status":"busy"}]
                 """)));
 
         assertThat(client.listAgents()).containsExactly(
-                new ChatwootAgent(7, "Анна", "online"), new ChatwootAgent(8, "Oleg", "busy"));
+                new ChatwootAgent(7, "Анна", "online", "https://cw/7.png"), new ChatwootAgent(8, "Oleg", "busy", null));
     }
 
     @Test

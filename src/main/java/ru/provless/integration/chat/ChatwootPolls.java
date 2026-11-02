@@ -115,6 +115,8 @@ public class ChatwootPolls {
             known = new ChatAgent(agent.id(), presence);
         }
         known.setAvailability(presence);
+        known.setName(agent.name());
+        known.setAvatarUrl(agent.avatarUrl());
         if ("online".equals(presence)) {
             // «был(а) в сети» = the last time a poll saw them online
             known.setLastSeenAt(now.atOffset(ZoneOffset.UTC));

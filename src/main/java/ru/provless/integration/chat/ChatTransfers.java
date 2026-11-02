@@ -32,14 +32,13 @@ public class ChatTransfers {
     private final ChatMessageLinkRepository links;
     private final ChatTransferCopyRepository copies;
     private final ChatwootFiles files;
-    private final ChatInboundPublisher inbound;
     private final ChatwootPolls polls;
-    private final ChatAgentRepository agents;
+    private final ChatHeader header;
     private final DateTimeFormatter stamp;
 
     public ChatTransfers(ChatwootClient chatwoot, ChatInboxes inboxes, ChatConversationRepository conversations,
                          ChatMessageLinkRepository links, ChatTransferCopyRepository copies, ChatwootFiles files,
-                         ChatInboundPublisher inbound, ChatwootPolls polls, ChatAgentRepository agents,
+                         ChatwootPolls polls, ChatHeader header,
                          @Value("${chatwoot.chat.copy-timezone:Europe/Moscow}") String timezone) {
         this.chatwoot = chatwoot;
         this.inboxes = inboxes;
@@ -47,9 +46,8 @@ public class ChatTransfers {
         this.links = links;
         this.copies = copies;
         this.files = files;
-        this.inbound = inbound;
         this.polls = polls;
-        this.agents = agents;
+        this.header = header;
         this.stamp = DateTimeFormatter.ofPattern("dd.MM HH:mm").withZone(ZoneId.of(timezone));
     }
 
@@ -142,9 +140,7 @@ public class ChatTransfers {
         Long assignee = live.map(ChatwootConversation::assigneeId).orElse(null);
         to.setAssigneeId(assignee);
         conversations.save(to);
-        String presence = assignee == null ? null : agents.findById(assignee).map(ChatAgent::getAvailability).orElse("offline");
-        inbound.send(new InboundEvents.ManagerChanged(to.getUserId(), assignee == null ? null : new InboundEvents.Manager(
-                InboundEvents.managerId(assignee), live.get().assigneeName(), null, false, presence, null)));
+        header.send(to.getUserId(), assignee, live.map(ChatwootConversation::assigneeName).orElse(null), null);
         polls.sendHours(to.getUserId(), to.getInboxId());
         log.info("Conversation {} of userId={} moved to {} as conversation {}", from.getConversationId(), from.getUserId(),
                 inboxes.name(to.getInboxId()), to.getConversationId());

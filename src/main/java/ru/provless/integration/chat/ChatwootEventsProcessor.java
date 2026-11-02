@@ -32,6 +32,7 @@ public class ChatwootEventsProcessor {
     private final ChatDepartments departments;
     private final ChatInboxes inboxes;
     private final ChatTransfers transfers;
+    private final ChatHeader header;
 
     public void process(JsonNode event) {
         String type = event.path("event").asText("");
@@ -114,7 +115,8 @@ public class ChatwootEventsProcessor {
 
     /**
      * Status and assignee of a conversation. For the user's current one a new assignee is the new manager in the app's
-     * header; a resolved one stays current until the user writes again (then a new request starts).
+     * header (taken off — the personal manager, if any); a resolved one stays current until the user writes again (then
+     * a new request starts).
      */
     void conversationChanged(JsonNode conversation) {
         Optional<UUID> userId = userOf(conversation);
@@ -136,9 +138,8 @@ public class ChatwootEventsProcessor {
         known.setAssigneeId(assigneeId);
         conversations.save(known);
         if (changed && known.isCurrent()) {
-            inbound.send(new InboundEvents.ManagerChanged(userId.get(), assigneeId == null ? null : new InboundEvents.Manager(
-                    InboundEvents.managerId(assigneeId), name(assignee), null, false,
-                    presence(assignee.path("availability_status").asText("offline")), null)));
+            header.send(userId.get(), assigneeId, assigneeId == null ? null : name(assignee),
+                    assigneeId == null ? null : presence(assignee.path("availability_status").asText("offline")));
         }
         transferIfLabelled(known, conversation);
     }
