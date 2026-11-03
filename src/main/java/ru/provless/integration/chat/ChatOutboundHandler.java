@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.provless.integration.chatwoot.ChatwootClient;
+import ru.provless.integration.order.OrderRouting;
 import ru.provless.integration.chatwoot.ChatwootUpload;
 
 import java.time.Instant;
@@ -30,6 +31,7 @@ public class ChatOutboundHandler {
     private final ChatInboxes inboxes;
     private final ChatStorage storage;
     private final ChatInboundPublisher inbound;
+    private final OrderRouting orders;
 
     /** @param redelivered the broker gave this event before: the message may already be in Chatwoot */
     public void handle(OutboundEvent event, boolean redelivered) {
@@ -55,6 +57,7 @@ public class ChatOutboundHandler {
         Optional<ChatMessageLink> known = links.findByMessageId(event.messageId());
         if (known.isPresent()) {
             confirm(known.get());
+            routeOrder(event);
             return;
         }
         ChatConversation conversation = conversations.current(event.userId());
@@ -64,6 +67,7 @@ public class ChatOutboundHandler {
                     .stream().filter(m -> sourceId.equals(m.sourceId())).findFirst();
             if (posted.isPresent()) {
                 confirm(save(posted.get().id(), posted.get().createdAt(), event, conversation));
+                routeOrder(event);
                 return;
             }
         }
@@ -73,10 +77,24 @@ public class ChatOutboundHandler {
             uploads.add(new ChatwootUpload(f.name(), f.mimeType(), storage.read(f.bucket(), f.objectKey())));
         }
         ChatwootClient.ChatwootMessageRef created = chatwoot.createIncomingMessage(conversation.getConversationId(),
-                event.text(), sourceId, inReplyTo, uploads);
+                event.order() == null ? event.text() : orderText(event.order()), sourceId, inReplyTo, uploads);
         confirm(save(created.id(), created.createdAt(), event, conversation));
+        routeOrder(event);
         log.info("Chat message {} of userId={} → Chatwoot {} (conversation {})", event.messageId(), event.userId(),
                 created.id(), conversation.getConversationId());
+    }
+
+    /** A placed order: to sales, to the personal manager, with the order's note (once; a repeat finds it done). */
+    private void routeOrder(OutboundEvent event) {
+        if (event.order() != null) {
+            orders.placed(event.userId(), event.order());
+        }
+    }
+
+    /** What the agent sees as the user's message: «🛒 Заказ № 1001 · 2 поз. · 6 590,00 ₽». */
+    static String orderText(OutboundEvent.Order order) {
+        return "🛒 Заказ № " + order.number() + " · " + order.positionsCount() + " поз. · "
+                + (order.total() == null ? "" : OrderRouting.money(order.total().amount()) + " ₽");
     }
 
     private ChatMessageLink save(long cwId, Instant cwCreatedAt, OutboundEvent event, ChatConversation conversation) {

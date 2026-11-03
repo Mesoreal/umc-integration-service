@@ -74,6 +74,7 @@ public class AccountDeletedListener {
                     + "(SELECT conversation_id FROM chatwoot.chat_conversation WHERE user_id = ?)", userId);
             jdbc.update("DELETE FROM chatwoot.chat_conversation WHERE user_id = ?", userId);
             jdbc.update("DELETE FROM chatwoot.app_contact_link WHERE user_id = ?", userId);
+            jdbc.update("DELETE FROM chatwoot.chat_order WHERE user_id = ?", userId);
             jdbc.update("INSERT INTO chatwoot.personal_manager_history (directus_id, user_id, assigned_by, assigned_at) "
                     + "SELECT directus_id, user_id, 'аккаунт удалён', now() FROM chatwoot.personal_manager "
                     + "WHERE user_id = ? AND agent_id IS NOT NULL", userId);

@@ -156,6 +156,10 @@ chatwoot:
   connect-timeout-ms: 2000
   read-timeout-ms: 10000
 
+# catalog-service internal API (X-Internal-Auth = internal.api-key): the whole order for the managers (orders/plan-manager.md).
+catalog-service:
+  base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+
 # auth-service internal API (X-Internal-Auth = internal.api-key): account by phone, for personal managers.
 auth-service:
   base-url: ${AUTH_SERVICE_URL:http://localhost:8081}

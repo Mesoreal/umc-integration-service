@@ -335,6 +335,13 @@ public class ChatwootClient {
         }
     }
 
+    /** Assigns the conversation to an agent (who must be a member of its inbox). */
+    public void assign(long conversationId, long agentId) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        body.put("assignee_id", agentId);
+        call(HttpMethod.POST, "/conversations/" + conversationId + "/assignments", body, false);
+    }
+
     /** Deletes a conversation with its messages (administrators only; Chatwoot does it in the background). */
     public void deleteConversation(long conversationId) {
         call(HttpMethod.DELETE, "/conversations/" + conversationId, null, true);

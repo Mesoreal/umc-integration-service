@@ -129,7 +129,7 @@ public abstract class ChatConnectorTestBase {
         }
     }
 
-    void outbound(String json) {
+    protected void outbound(String json) {
         MessageProperties props = new MessageProperties();
         props.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         rabbit.send("", ChatQueues.OUTBOUND, new Message(json.getBytes(StandardCharsets.UTF_8), props));

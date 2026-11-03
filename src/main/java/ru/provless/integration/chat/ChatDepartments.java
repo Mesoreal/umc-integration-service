@@ -16,6 +16,10 @@ public record ChatDepartments(List<Department> departments) {
     public record Department(String key, String label, String inboxName) {
     }
 
+    public Optional<Department> byKey(String key) {
+        return departments.stream().filter(d -> d.key().equals(key)).findFirst();
+    }
+
     public Optional<Department> byLabel(String label) {
         return departments.stream().filter(d -> d.label().equalsIgnoreCase(label)).findFirst();
     }

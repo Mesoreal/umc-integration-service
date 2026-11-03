@@ -22,7 +22,19 @@ public record OutboundEvent(String type, UUID eventId, UUID userId,
                             // client.read / client.delivered
                             Long upToSeq, String upToExternalId, Instant at,
                             // client.typing
-                            Boolean isTyping) {
+                            Boolean isTyping,
+                            // message.created of a placed order
+                            Order order) {
+
+    /** The order card of the user's message (orders/plan-manager.md §2.1). */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+    public record Order(UUID id, long number, String status, int positionsCount, Money total) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Money(String amount, String currency) {
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
