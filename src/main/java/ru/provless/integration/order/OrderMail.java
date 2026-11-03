@@ -20,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import ru.provless.integration.chat.ChatDepartments;
 import ru.provless.integration.chat.ChatInboxes;
 import ru.provless.integration.chatwoot.ChatwootClient;
@@ -54,13 +55,15 @@ public class OrderMail {
     private final String url;
     private final String token;
     private final boolean chatwootEnabled;
+    private final boolean lettersOn;
     private final ObjectMapper json = new ObjectMapper();
     private RestClient site;
 
     public OrderMail(CatalogOrdersClient catalog, PersonalManagerRepository personalManagers, ChatwootClient chatwoot,
                      ChatInboxes inboxes, ChatDepartments departments, ChatwootLinks links,
                      @Value("${site.url:}") String url, @Value("${site.token:}") String token,
-                     @Value("${chatwoot.enabled:false}") boolean chatwootEnabled) {
+                     @Value("${chatwoot.enabled:false}") boolean chatwootEnabled,
+                     @Value("${site.order-letters:false}") boolean lettersOn) {
         this.catalog = catalog;
         this.personalManagers = personalManagers;
         this.chatwoot = chatwoot;
@@ -70,6 +73,7 @@ public class OrderMail {
         this.url = url.replaceAll("/+$", "");
         this.token = token;
         this.chatwootEnabled = chatwootEnabled;
+        this.lettersOn = lettersOn;
     }
 
     @PostConstruct
@@ -83,8 +87,9 @@ public class OrderMail {
         log.info("Order letters via the site: enabled={} url={}", enabled(), url);
     }
 
+    /** The site's address and token, and the switch: the site's method may not exist yet. */
     boolean enabled() {
-        return !url.isEmpty() && !token.isEmpty();
+        return lettersOn && !url.isEmpty() && !token.isEmpty();
     }
 
     @RabbitListener(queues = QUEUE)
@@ -100,7 +105,14 @@ public class OrderMail {
         }
         UUID orderId = UUID.fromString(event.path("order_id").asText());
         Map<String, Object> letter = letter(orderId, catalog.order(orderId));
-        site.post().uri("/api/app/order-notifications/").contentType(MediaType.APPLICATION_JSON).body(letter).retrieve().toBodilessEntity();
+        try {
+            site.post().uri("/api/app/order-notifications/").contentType(MediaType.APPLICATION_JSON).body(letter).retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException e) {
+            // the site's error page is not worth the log: the code is
+            throw new IllegalStateException("The site answered " + e.getStatusCode().value() + " to the letter of order "
+                    + letter.get("number"));
+        }
         log.info("Order {}: letter to the sales department handed to the site", letter.get("number"));
     }
 

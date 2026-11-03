@@ -268,10 +268,19 @@ public class ChatwootClient {
      * ({@code lock_to_single_conversation} false by default), so this really creates one — a new request.
      */
     public ChatwootConversation createConversation(long inboxId, long contactId, String sourceId) {
+        return createConversation(inboxId, contactId, sourceId, Map.of());
+    }
+
+    /** {@code additionalAttributes} — service marks, not shown to agents as editable attributes; they come back in webhooks. */
+    public ChatwootConversation createConversation(long inboxId, long contactId, String sourceId,
+                                                   Map<String, Object> additionalAttributes) {
         ObjectNode body = jsonMapper.createObjectNode();
         body.put("inbox_id", inboxId);
         body.put("contact_id", contactId);
         body.put("source_id", sourceId);
+        if (!additionalAttributes.isEmpty()) {
+            body.set("additional_attributes", jsonMapper.valueToTree(additionalAttributes));
+        }
         return toConversation(call(HttpMethod.POST, "/conversations", body, false));
     }
 

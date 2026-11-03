@@ -168,6 +168,19 @@ class ChatwootWebhookIT extends ChatConnectorTestBase {
     }
 
     @Test
+    void transfersNewConversation_beforeTheTransferRecordsIt_leftToTheTransfer() throws Exception {
+        jdbc.update("INSERT INTO chatwoot.chat_conversation (conversation_id, user_id, contact_id, inbox_id, status, current) "
+                + "VALUES (15, ?, 42, 5, 'open', true)", user);
+        String created = conversation(142, null, null).replace("\"inbox_id\":5,", "\"inbox_id\":5,\"additional_attributes\":{\"transfer_from\":15},");
+        webhook("{\"event\":\"conversation_created\"," + created.substring(1)).andExpect(status().isOk());
+        Thread.sleep(1500);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM chatwoot.chat_conversation WHERE conversation_id = 142", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT conversation_id FROM chatwoot.chat_conversation WHERE user_id = ? AND current",
+                Long.class, user)).isEqualTo(15L);
+    }
+
+    @Test
     void setup_pointsTheWebhookAtTheService() {
         chatwoot.stubFor(get(ACCOUNT + "/inboxes/5").willReturn(okJson(
                 "{\"id\":5,\"inbox_identifier\":\"appIdent\",\"secret\":\"" + SECRET + "\",\"webhook_url\":\"\"}")));

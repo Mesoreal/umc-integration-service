@@ -14,6 +14,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -51,6 +52,12 @@ public class ChatTransfers {
         this.stamp = DateTimeFormatter.ofPattern("dd.MM HH:mm").withZone(ZoneId.of(timezone));
     }
 
+    /**
+     * The mark on a conversation a transfer creates. Its webhook may come before the transfer records the conversation (a transfer
+     * of an order runs on another thread than the webhooks): the webhook leaves such a conversation to the transfer.
+     */
+    static final String TRANSFER_FROM = "transfer_from";
+
     public void transfer(ChatConversation from, ChatDepartments.Department department) {
         long target = inboxes.departmentInboxId(department);
         if (from.getInboxId() == target || isDone(from)) {
@@ -73,7 +80,8 @@ public class ChatTransfers {
         }
         String userId = from.getUserId().toString();
         chatwoot.addContactInbox(from.getContactId(), target, userId);
-        ChatwootConversation created = chatwoot.createConversation(target, from.getContactId(), userId);
+        ChatwootConversation created = chatwoot.createConversation(target, from.getContactId(), userId,
+                Map.of(TRANSFER_FROM, from.getConversationId()));
         chatwoot.createPrivateNote(created.id(), "↪ Передано из «" + inboxes.name(from.getInboxId()) + "» "
                 + stamp.format(Instant.now()) + ". Ниже — переписка обращения, время сообщений — в их первой строке.", null);
         ChatConversation to = new ChatConversation(created.id(), from.getUserId(), from.getContactId(), target, created.status());

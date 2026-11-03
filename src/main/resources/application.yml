@@ -192,3 +192,5 @@ manager-panel:
 site:
   url: ${AUTH_SITE_URL:}
   token: ${AUTH_SITE_TOKEN:}
+  # The site's method is not made yet (next sprint): letters are off until ORDER_LETTERS_ENABLED=true in mesoreal-config.
+  order-letters: ${ORDER_LETTERS_ENABLED:false}

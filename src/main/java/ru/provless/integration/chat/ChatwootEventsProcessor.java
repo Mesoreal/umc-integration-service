@@ -124,6 +124,12 @@ public class ChatwootEventsProcessor {
             return;
         }
         long conversationId = conversation.path("id").asLong();
+        if (conversations.findById(conversationId).isEmpty()
+                && conversation.path("additional_attributes").hasNonNull(ChatTransfers.TRANSFER_FROM)) {
+            // a transfer's new conversation not recorded by the transfer yet: it records it itself
+            log.debug("Conversation {} of a transfer in progress: left to the transfer", conversationId);
+            return;
+        }
         ChatConversation known = track(conversationId, userId.get(), conversation);
         if (ChatTransfers.isDone(known)) {
             // a late event of a conversation that was moved (and deleted): nothing in it matters any more

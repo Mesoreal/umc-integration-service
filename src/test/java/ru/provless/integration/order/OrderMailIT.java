@@ -23,7 +23,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** The sales department's letter through the site (orders/task-site-order-email.md); site and catalog-service — WireMock. */
-@TestPropertySource(properties = {"site.token=site-token", "chatwoot.public-url=https://chat.test"})
+@TestPropertySource(properties = {"site.token=site-token", "site.order-letters=true", "chatwoot.public-url=https://chat.test"})
 class OrderMailIT extends ChatConnectorTestBase {
 
     @DynamicPropertySource
