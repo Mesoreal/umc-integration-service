@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Заказы клиента</title>
+<!-- The managers' panel (orders/plan-manager.md §2.2): a tab of the Chatwoot conversation. Chatwoot sends the context
+     (conversation, contact, agent, theme) by postMessage; the API is /manager-panel/api/** with the key of this page's address. -->
+<style>
+  :root { --bg:#fff; --fg:#1f2d3d; --muted:#6b7a8c; --line:#e3e8ef; --card:#f7f9fb; --accent:#1f93ff; --danger:#d93025; --ok:#1e8e3e; }
+  :root.dark { --bg:#151718; --fg:#e8eaed; --muted:#9aa4af; --line:#2c3033; --card:#1d2023; --accent:#3a9bff; --danger:#f28b82; --ok:#81c995; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:12px; background:var(--bg); color:var(--fg); font:14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-size:15px; margin:0 0 10px; }
+  .muted { color:var(--muted); }
+  .order { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+  .head { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
+  .num { font-weight:600; }
+  .status { font-size:12px; padding:2px 8px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; }
+  .status.done { color:var(--ok); } .status.cancelled { color:var(--danger); }
+  .row { margin-top:6px; }
+  .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  button { font:inherit; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { color:var(--danger); }
+  button:disabled { opacity:.5; cursor:default; }
+  .delivery { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; align-items:center; }
+  input { font:inherit; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); width:110px; }
+  .error { color:var(--danger); margin-top:6px; }
+</style>
+</head>
+<body>
+<h1>Заказы клиента</h1>
+<div id="list" class="muted">Загрузка…</div>
+<script>
+(function () {
+  "use strict";
+  var LABELS = { pending: "Ожидает", processing: "Собираем заказ", shipped: "Передано в доставку", delivered: "Получен", cancelled: "Отменён" };
+  var ACTIONS = { processing: "Собираем", shipped: "Передано в доставку", delivered: "Получен", cancelled: "Отменить" };
+  var key = new URLSearchParams(location.search).get("key") || "";
+  var list = document.getElementById("list");
+  var ctx = null;
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function money(p) { return p ? Number(p.amount).toLocaleString("ru-RU", { minimumFractionDigits: 2 }) + " ₽" : ""; }
+  function date(iso) { return new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+
+  function api(method, path, body) {
+    return fetch("/manager-panel/api" + path, {
+      method: method,
+      headers: { "X-Panel-Key": key, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var json = t ? JSON.parse(t) : null;
+        if (!r.ok) throw new Error((json && (json.message || json.error_code)) || ("Ошибка " + r.status));
+        return json;
+      });
+    });
+  }
+
+  function userId() {
+    var contact = ctx.contact || {}, conversation = ctx.conversation || {};
+    var attrs = contact.custom_attributes || (conversation.meta && conversation.meta.sender && conversation.meta.sender.custom_attributes) || {};
+    return attrs.app_user_id || null;
+  }
+
+  function common() {
+    return { agent_name: ctx.currentAgent && ctx.currentAgent.name, conversation_id: ctx.conversation && ctx.conversation.id };
+  }
+
+  function load() {
+    var id = userId();
+    if (!id) { list.className = "muted"; list.textContent = "Клиент не из приложения — заказов в приложении нет."; return; }
+    api("GET", "/orders?user_id=" + encodeURIComponent(id)).then(render).catch(function (e) {
+      list.className = "error"; list.textContent = "Не загрузилось: " + e.message;
+    });
+  }
+
+  function render(orders) {
+    list.className = ""; list.textContent = "";
+    if (!orders.length) { list.className = "muted"; list.textContent = "Заказов нет."; return; }
+    orders.forEach(function (o) { list.appendChild(card(o)); });
+  }
+
+  function card(o) {
+    var box = el("div", "order");
+    var head = el("div", "head");
+    head.appendChild(el("span", "num", "№ " + o.number + " · " + date(o.created_at)));
+    var cls = o.status === "delivered" ? "status done" : o.status === "cancelled" ? "status cancelled" : "status";
+    head.appendChild(el("span", cls, LABELS[o.status] || o.status));
+    box.appendChild(head);
+    box.appendChild(el("div", "row", o.positions_count + " поз. · " + o.items_count + " шт. · " + money(o.total)));
+    if (o.delivery_price || o.delivery_date) {
+      box.appendChild(el("div", "row muted", "Доставка: " + (o.delivery_price ? money(o.delivery_price) : "—")
+        + (o.delivery_date ? ", " + o.delivery_date : "")));
+    }
+    var error = el("div", "error");
+
+    if (o.next_statuses && o.next_statuses.length) {
+      var actions = el("div", "actions");
+      o.next_statuses.forEach(function (s) {
+        var b = el("button", s === "cancelled" ? "danger" : "primary", ACTIONS[s] || LABELS[s] || s);
+        b.onclick = function () {
+          if (s === "cancelled" && !confirm("Отменить заказ № " + o.number + "?")) return;
+          act(box, error, api("POST", "/orders/" + o.id + "/status", Object.assign({ status: s }, common())));
+        };
+        actions.appendChild(b);
+      });
+      box.appendChild(actions);
+
+      var delivery = el("div", "delivery");
+      var price = el("input"); price.type = "number"; price.min = "0"; price.step = "0.01"; price.placeholder = "Доставка, ₽";
+      if (o.delivery_price) price.value = o.delivery_price.amount;
+      var day = el("input"); day.type = "date"; day.style.width = "140px";
+      if (o.delivery_date) day.value = o.delivery_date;
+      var save = el("button", "", "Сохранить доставку");
+      save.onclick = function () {
+        act(box, error, api("PUT", "/orders/" + o.id + "/delivery",
+          Object.assign({ delivery_price: price.value, delivery_date: day.value }, common())));
+      };
+      delivery.appendChild(price); delivery.appendChild(day); delivery.appendChild(save);
+      box.appendChild(delivery);
+    }
+    box.appendChild(error);
+    return box;
+  }
+
+  function act(box, error, request) {
+    box.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+    error.textContent = "";
+    request.then(load).catch(function (e) {
+      error.textContent = e.message;
+      box.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+    });
+  }
+
+  window.addEventListener("message", function (event) {
+    var message;
+    try { message = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch (e) { return; }
+    if (!message || message.event !== "appContext") return;
+    ctx = message.data || {};
+    document.documentElement.classList.toggle("dark", ctx.theme === "dark");
+    load();
+  });
+  window.parent.postMessage("chatwoot-dashboard-app:fetch-info", "*");
+})();
+</script>
+</body>
+</html>

@@ -178,3 +178,9 @@ personal-manager:
   poll-initial-delay: PT30S
   managers-poll-interval: PT5M
   assignments-poll-interval: PT1M
+
+# The managers' panel «Заказы клиента» (orders/plan-manager.md §2.2): a tab of the Chatwoot conversation with our page. url — its
+# public address without the key; the service registers it in Chatwoot (as a Dashboard App) with ?key=<key>. Empty — no panel.
+manager-panel:
+  url: ${MANAGER_PANEL_URL:}
+  key: ${MANAGER_PANEL_KEY:}

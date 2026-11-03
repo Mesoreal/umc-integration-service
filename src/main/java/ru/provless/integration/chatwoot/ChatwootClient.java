@@ -438,6 +438,35 @@ public class ChatwootClient {
         return members;
     }
 
+    // ─── Dashboard apps (a tab of the conversation with our page) ────────────
+
+    /** {@code [id, title, url of the first frame]} of each dashboard app of the account. */
+    public List<String[]> dashboardApps() {
+        List<String[]> apps = new ArrayList<>();
+        for (JsonNode app : call(HttpMethod.GET, "/dashboard_apps", null, false)) {
+            apps.add(new String[]{app.path("id").asText(), app.path("title").asText(), app.path("content").path(0).path("url").asText()});
+        }
+        return apps;
+    }
+
+    public void createDashboardApp(String title, String url) {
+        call(HttpMethod.POST, "/dashboard_apps", dashboardApp(title, url), false);
+    }
+
+    public void updateDashboardApp(String id, String title, String url) {
+        call(HttpMethod.PATCH, "/dashboard_apps/" + id, dashboardApp(title, url), false);
+    }
+
+    private ObjectNode dashboardApp(String title, String url) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        ObjectNode app = body.putObject("dashboard_app");
+        app.put("title", title);
+        ObjectNode frame = app.putArray("content").addObject();
+        frame.put("type", "frame");
+        frame.put("url", url);
+        return body;
+    }
+
     // ─── Public API of the app inbox (acts as the contact) ──────────────────
 
     /** The user saw the conversation now: Chatwoot marks every agent message before it read. */

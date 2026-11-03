@@ -7,11 +7,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -43,6 +47,57 @@ public class CatalogOrdersClient {
                 .defaultHeader("User-Agent", "integration-service")
                 .build();
         log.info("CatalogOrdersClient initialized: baseUrl={}", baseUrl);
+    }
+
+    /** The client's orders with {@code next_statuses}, newest first. */
+    public JsonNode ofClient(UUID userId) {
+        return send(() -> restClient.get().uri("/internal/orders?user_id={id}", userId).retrieve().body(String.class));
+    }
+
+    public JsonNode changeStatus(UUID orderId, String status, String changedBy) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", status);
+        body.put("changed_by", changedBy);
+        return send(() -> restClient.post().uri("/internal/orders/{id}/status", orderId).contentType(MediaType.APPLICATION_JSON)
+                .body(body).retrieve().body(String.class));
+    }
+
+    public JsonNode setDelivery(UUID orderId, String price, String date) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("delivery_price", price);
+        body.put("delivery_date", date);
+        return send(() -> restClient.put().uri("/internal/orders/{id}/delivery", orderId).contentType(MediaType.APPLICATION_JSON)
+                .body(body).retrieve().body(String.class));
+    }
+
+    /** catalog-service's refusal (4xx) with its answer, to pass on as it is. */
+    public static class Refused extends RuntimeException {
+        private final int status;
+        private final String body;
+
+        Refused(int status, String body) {
+            super("catalog-service: " + status);
+            this.status = status;
+            this.body = body;
+        }
+
+        public int status() {
+            return status;
+        }
+
+        public String body() {
+            return body;
+        }
+    }
+
+    private JsonNode send(java.util.function.Supplier<String> call) {
+        try {
+            return jsonMapper.readTree(call.get());
+        } catch (HttpClientErrorException e) {
+            throw new Refused(e.getStatusCode().value(), e.getResponseBodyAsString());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unreadable answer of catalog-service", e);
+        }
     }
 
     public JsonNode order(UUID orderId) {
