@@ -116,6 +116,8 @@ chatwoot:
   account-id: ${CHATWOOT_ACCOUNT_ID:}
   # Токен отдельного сервисного пользователя-администратора Chatwoot, не личный.
   api-token: ${CHATWOOT_API_TOKEN:}
+  # The address people open Chatwoot at (links in Directus «Заказы»); empty — no links.
+  public-url: ${CHATWOOT_PUBLIC_URL:}
   app-inbox-name: ${CHATWOOT_APP_INBOX_NAME:Входящие - Приложение}
   # Earlier names of that inbox (comma-separated): found under one of them, it is renamed to app-inbox-name.
   app-inbox-legacy-name: Приложение,Приложение — входящие

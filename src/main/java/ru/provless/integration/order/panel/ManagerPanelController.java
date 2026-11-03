@@ -19,8 +19,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.provless.integration.chatwoot.ChatwootClient;
 import ru.provless.integration.order.CatalogOrdersClient;
+import ru.provless.integration.order.OrderLabels;
 
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -30,9 +30,6 @@ import java.util.UUID;
 @Slf4j
 @RestController
 public class ManagerPanelController {
-
-    static final Map<String, String> LABELS = Map.of("pending", "Ожидает", "processing", "Собираем заказ",
-            "shipped", "Передано в доставку", "delivered", "Получен", "cancelled", "Отменён");
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record StatusRequest(String status, String agentName, Long conversationId) {
@@ -68,7 +65,7 @@ public class ManagerPanelController {
         String agent = agent(body.agentName());
         JsonNode order = catalog.changeStatus(id, body.status(), agent);
         note(body.conversationId(), agent + ": заказ № " + order.path("number").asLong() + " → "
-                + LABELS.getOrDefault(order.path("status").asText(), order.path("status").asText()));
+                + OrderLabels.status(order.path("status").asText()));
         return order;
     }
 

@@ -130,6 +130,19 @@ public class DirectusClient {
         }
     }
 
+    // ─── «Заказы» (orders/plan-manager.md §3) ───────────────────────────────
+
+    /** The copy of an order, by its id: created when missing, otherwise these fields replaced. */
+    public void upsertOrder(UUID id, Map<String, Object> fields) {
+        if (get("/items/orders?filter[id][_eq]=" + id + "&fields=id").isEmpty()) {
+            Map<String, Object> body = new LinkedHashMap<>(fields);
+            body.put("id", id.toString());
+            send(restClient.post().uri("/items/orders"), body);
+        } else {
+            send(restClient.patch().uri("/items/orders/{id}", id), fields);
+        }
+    }
+
     // ─── HTTP ───────────────────────────────────────────────────────────────
 
     private JsonNode get(String uri) {

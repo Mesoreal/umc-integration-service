@@ -90,7 +90,7 @@ public abstract class ChatConnectorTestBase {
     AppContactService appContacts;
 
     @Autowired
-    RabbitTemplate rabbit;
+    protected RabbitTemplate rabbit;
     @Autowired
     protected JdbcTemplate jdbc;
 
