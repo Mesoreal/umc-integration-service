@@ -186,3 +186,9 @@ personal-manager:
 manager-panel:
   url: ${MANAGER_PANEL_URL:}
   key: ${MANAGER_PANEL_KEY:}
+
+# The site (Django): the sales department's letter about a new order (orders/task-site-order-email.md). The same address and token as
+# auth-service's account deletion requests (AUTH_SITE_URL in mesoreal-config, AUTH_SITE_TOKEN in mesoreal-secrets). Empty — no letters.
+site:
+  url: ${AUTH_SITE_URL:}
+  token: ${AUTH_SITE_TOKEN:}

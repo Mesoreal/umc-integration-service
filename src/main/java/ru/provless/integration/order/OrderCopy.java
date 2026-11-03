@@ -6,10 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpRejectAndDontRequeueException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import ru.provless.integration.chatwoot.AppContactLinkRepository;
-import ru.provless.integration.chatwoot.AppContactLink;
 import ru.provless.integration.manager.DirectusClient;
 
 import java.io.IOException;
@@ -33,18 +30,13 @@ public class OrderCopy {
 
     private final CatalogOrdersClient catalog;
     private final DirectusClient directus;
-    private final AppContactLinkRepository contacts;
-    private final String chatwootUrl;
-    private final String accountId;
+    private final ChatwootLinks links;
     private final ObjectMapper json = new ObjectMapper();
 
-    public OrderCopy(CatalogOrdersClient catalog, DirectusClient directus, AppContactLinkRepository contacts,
-                     @Value("${chatwoot.public-url:}") String chatwootUrl, @Value("${chatwoot.account-id:}") String accountId) {
+    public OrderCopy(CatalogOrdersClient catalog, DirectusClient directus, ChatwootLinks links) {
         this.catalog = catalog;
         this.directus = directus;
-        this.contacts = contacts;
-        this.chatwootUrl = chatwootUrl.replaceAll("/+$", "");
-        this.accountId = accountId;
+        this.links = links;
     }
 
     @RabbitListener(queues = OrderQueues.QUEUE)
@@ -83,7 +75,7 @@ public class OrderCopy {
         f.put("delivery_date", text(o, "delivery_date"));
         f.put("comment", text(o, "comment"));
         f.put("last_change", lastChange(event));
-        f.put("chatwoot_url", contactUrl(whole));
+        f.put("chatwoot_url", links.contact(text(whole, "user_id")));
         return f;
     }
 
@@ -117,15 +109,6 @@ public class OrderCopy {
             case "order.delivery_changed" -> "доставка изменена, " + at;
             default -> type + ", " + at;
         };
-    }
-
-    private String contactUrl(JsonNode whole) {
-        String userId = text(whole, "user_id");
-        if (chatwootUrl.isEmpty() || userId == null) {
-            return null;
-        }
-        return contacts.findById(UUID.fromString(userId)).map(AppContactLink::getContactId)
-                .map(contact -> chatwootUrl + "/app/accounts/" + accountId + "/contacts/" + contact).orElse(null);
     }
 
     private static String text(JsonNode node, String field) {
