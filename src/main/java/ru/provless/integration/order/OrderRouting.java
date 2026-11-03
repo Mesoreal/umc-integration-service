@@ -119,7 +119,8 @@ public class OrderRouting {
                         .append(money(item.path("price").path("amount").asText())).append(" = ")
                         .append(money(item.path("line_total").path("amount").asText())).append(" ₽\n");
             }
-            note.append("Итого: ").append(money(o.path("total").path("amount").asText())).append(" ₽ (")
+            // a blank line: Chatwoot renders notes as Markdown, without it the total joins the numbered list
+            note.append("\nИтого: ").append(money(o.path("total").path("amount").asText())).append(" ₽ (")
                     .append(o.path("items_count").asInt()).append(" шт.)\n");
         } catch (RuntimeException e) {
             log.warn("Order {} not read from catalog-service, the note is short: {}", order.number(), e.getMessage());

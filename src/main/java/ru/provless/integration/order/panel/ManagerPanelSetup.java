@@ -25,6 +25,8 @@ public class ManagerPanelSetup {
         this.chatwoot = chatwoot;
         this.enabled = chatwootEnabled && !url.isBlank() && !key.isBlank();
         this.url = enabled ? url + (url.contains("?") ? "&" : "?") + "key=" + key : null;
+        log.info("Manager panel «{}»: enabled={} (chatwoot={}, url={}, key {})", TITLE, enabled, chatwootEnabled,
+                url.isBlank() ? "-" : url, key.isBlank() ? "missing" : "set");
     }
 
     @Scheduled(initialDelayString = "${chatwoot.chat.poll-initial-delay}", fixedDelayString = "PT10M")
