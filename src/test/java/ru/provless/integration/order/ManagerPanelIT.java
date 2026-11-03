@@ -94,7 +94,7 @@ class ManagerPanelIT extends ChatConnectorTestBase {
                 .withRequestBody(matchingJsonPath("$.private", equalTo("true")))
                 .withRequestBody(containing("Пётр: заказ № 1001 → Собираем заказ")));
         chatwoot.verify(postRequestedFor(urlEqualTo(ACCOUNT + "/conversations/30/messages"))
-                .withRequestBody(containing("Пётр: заказ № 1001 — доставка 450.00 ₽, 2026-11-05")));
+                .withRequestBody(containing("Пётр: заказ № 1001 — доставка 450,00 ₽, 05.11.2026")));
     }
 
     @Test

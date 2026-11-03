@@ -48,6 +48,7 @@
     return e;
   }
   function money(p) { return p ? Number(p.amount).toLocaleString("ru-RU", { minimumFractionDigits: 2 }) + " ₽" : ""; }
+  function day(iso) { var p = iso.split("-"); return p[2] + "." + p[1] + "." + p[0]; }
   function date(iso) { return new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
 
   function api(method, path, body) {
@@ -98,7 +99,7 @@
     box.appendChild(el("div", "row", o.positions_count + " поз. · " + o.items_count + " шт. · " + money(o.total)));
     if (o.delivery_price || o.delivery_date) {
       box.appendChild(el("div", "row muted", "Доставка: " + (o.delivery_price ? money(o.delivery_price) : "—")
-        + (o.delivery_date ? ", " + o.delivery_date : "")));
+        + (o.delivery_date ? ", " + day(o.delivery_date) : "")));
     }
     var error = el("div", "error");
 

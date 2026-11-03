@@ -20,7 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 import ru.provless.integration.chatwoot.ChatwootClient;
 import ru.provless.integration.order.CatalogOrdersClient;
 import ru.provless.integration.order.OrderLabels;
+import ru.provless.integration.order.OrderRouting;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 /**
@@ -38,6 +41,8 @@ public class ManagerPanelController {
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public record DeliveryRequest(String deliveryPrice, String deliveryDate, String agentName, Long conversationId) {
     }
+
+    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     private final CatalogOrdersClient catalog;
     private final ChatwootClient chatwoot;
@@ -76,7 +81,8 @@ public class ManagerPanelController {
         String price = order.path("delivery_price").path("amount").asText(null);
         String date = order.path("delivery_date").asText(null);
         note(body.conversationId(), agent + ": заказ № " + order.path("number").asLong() + " — доставка "
-                + (price == null ? "без стоимости" : price + " ₽") + (date == null ? "" : ", " + date));
+                + (price == null ? "без стоимости" : OrderRouting.money(price) + " ₽")
+                + (date == null ? "" : ", " + LocalDate.parse(date).format(DAY)));
         return order;
     }
 
