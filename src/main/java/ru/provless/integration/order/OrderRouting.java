@@ -106,6 +106,10 @@ public class OrderRouting {
                 line(note, "Организация", join(text(org, "name"), text(org, "inn") == null ? null : "ИНН " + text(org, "inn")));
             }
             line(note, "Адрес", text(o, "delivery_address"));
+            JsonNode recipient = o.path("delivery_recipient");
+            if (recipient.isObject()) {
+                line(note, "Получатель", join(text(recipient, "name"), text(recipient, "phone")));
+            }
             line(note, "Комментарий", text(o, "comment"));
             note.append('\n');
             int i = 1;
@@ -141,7 +145,7 @@ public class OrderRouting {
         }
     }
 
-    private static String join(String a, String b) {
+    static String join(String a, String b) {
         return a == null ? b : b == null ? a : a + ", " + b;
     }
 

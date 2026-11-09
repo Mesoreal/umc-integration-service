@@ -69,6 +69,8 @@ public class OrderCopy {
         JsonNode org = o.path("organization");
         f.put("organization", org.isObject() ? text(org, "name") + (text(org, "inn") == null ? "" : ", ИНН " + text(org, "inn")) : null);
         f.put("delivery_address", text(o, "delivery_address"));
+        JsonNode recipient = o.path("delivery_recipient");
+        f.put("delivery_recipient", recipient.isObject() ? OrderRouting.join(text(recipient, "name"), text(recipient, "phone")) : null);
         f.put("items", items(o));
         f.put("total", text(o.path("total"), "amount"));
         f.put("delivery_price", text(o.path("delivery_price"), "amount"));

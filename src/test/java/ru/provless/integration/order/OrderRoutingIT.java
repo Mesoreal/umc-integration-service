@@ -71,6 +71,7 @@ class OrderRoutingIT extends ChatConnectorTestBase {
                 {"user_id":"%s","buyer":{"full_name":"Иванова Анна","phone":"+79990000001"},
                  "order":{"number":1001,"items_count":3,"total":{"amount":"6590.00","currency":"RUB"},
                           "delivery_address":"г. Москва, ул. Тверская, д. 10","organization":{"name":"ООО Клиника","inn":"7701234567"},
+                          "delivery_recipient":{"name":"Анна Смирнова","phone":null},
                           "comment":"Позвонить","items":[
                    {"name":"Сыворотка","article":"ART-1","unit":"шт","quantity":1,"price":{"amount":"1890.00"},"line_total":{"amount":"1890.00"}},
                    {"name":"Крем","article":"ART-2","unit":"шт","quantity":2,"price":{"amount":"2350.00"},"line_total":{"amount":"4700.00"}}]}}
@@ -89,6 +90,7 @@ class OrderRoutingIT extends ChatConnectorTestBase {
                 .withRequestBody(matchingJsonPath("$.private", equalTo("true")))
                 .withRequestBody(containing("Покупатель: Иванова Анна, +79990000001"))
                 .withRequestBody(containing("Организация: ООО Клиника, ИНН 7701234567"))
+                .withRequestBody(containing("Получатель: Анна Смирнова"))
                 .withRequestBody(containing("2. Крем (ART-2) — 2 шт × 2 350,00 = 4 700,00 ₽"))
                 .withRequestBody(containing("Итого: 6 590,00 ₽ (3 шт.)")));
         assertThat(jdbc.queryForObject("SELECT conversation_id FROM chatwoot.chat_order WHERE order_id = ?", Long.class, orderId))
