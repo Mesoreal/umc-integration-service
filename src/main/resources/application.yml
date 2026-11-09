@@ -181,6 +181,10 @@ personal-manager:
   managers-poll-interval: PT5M
   assignments-poll-interval: PT1M
 
+# Graduates (front requests S5 §6): Directus «Выпускники» → profile-service is_graduate.
+graduates:
+  poll-interval: PT5M
+
 # The managers' panel «Заказы клиента» (orders/plan-manager.md §2.2): a tab of the Chatwoot conversation with our page. url — its
 # public address without the key; the service registers it in Chatwoot (as a Dashboard App) with ?key=<key>. Empty — no panel.
 manager-panel:

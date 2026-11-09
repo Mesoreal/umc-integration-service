@@ -57,6 +57,12 @@ public class ProfileServiceClient {
                 baseUrl, connectTimeoutMs, readTimeoutMs);
     }
 
+    /** Exactly these users are graduates now (contract §17.1): profile-service replaces the previous list. */
+    public void replaceGraduates(java.util.Collection<UUID> userIds) {
+        restClient.put().uri("/internal/profiles/graduates").contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(java.util.Map.of("user_ids", userIds)).retrieve().toBodilessEntity();
+    }
+
     public FileContent fetchFile(UUID userId, UUID fileId) {
         try {
             ResponseEntity<byte[]> response = restClient.get()

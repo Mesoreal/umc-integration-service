@@ -143,6 +143,24 @@ public class DirectusClient {
         }
     }
 
+    // ─── graduates (front requests S5 §6) ──────────────────────────────────
+
+    /** A row of «Выпускники»: the client's phone and what the service last wrote into «Клиент в приложении». */
+    public record GraduateRow(UUID id, String phone, String client) {
+    }
+
+    public List<GraduateRow> graduates() {
+        List<GraduateRow> rows = new ArrayList<>();
+        for (JsonNode r : get("/items/graduates?limit=-1&fields=id,phone,client")) {
+            rows.add(new GraduateRow(UUID.fromString(r.path("id").asText()), text(r, "phone"), text(r, "client")));
+        }
+        return rows;
+    }
+
+    public void updateGraduate(UUID id, Map<String, Object> fields) {
+        send(restClient.patch().uri("/items/graduates/{id}", id), fields);
+    }
+
     // ─── HTTP ───────────────────────────────────────────────────────────────
 
     private JsonNode get(String uri) {
