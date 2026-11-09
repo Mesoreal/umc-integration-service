@@ -35,7 +35,7 @@ import java.util.UUID;
 public class ManagerPanelController {
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record StatusRequest(String status, String agentName, Long conversationId) {
+    public record StatusRequest(String status, String comment, String agentName, Long conversationId) {
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -68,9 +68,10 @@ public class ManagerPanelController {
     @PostMapping("/manager-panel/api/orders/{id}/status")
     public JsonNode status(@PathVariable("id") UUID id, @RequestBody StatusRequest body) {
         String agent = agent(body.agentName());
-        JsonNode order = catalog.changeStatus(id, body.status(), agent);
+        String comment = blankToNull(body.comment());
+        JsonNode order = catalog.changeStatus(id, body.status(), agent, comment);
         note(body.conversationId(), agent + ": заказ № " + order.path("number").asLong() + " → "
-                + OrderLabels.status(order.path("status").asText()));
+                + OrderLabels.status(order.path("status").asText()) + (comment == null ? "" : "\nКлиенту: " + comment));
         return order;
     }
 

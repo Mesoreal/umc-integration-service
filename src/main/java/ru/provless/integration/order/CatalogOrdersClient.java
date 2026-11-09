@@ -54,10 +54,12 @@ public class CatalogOrdersClient {
         return send(() -> restClient.get().uri("/internal/orders?user_id={id}", userId).retrieve().body(String.class));
     }
 
-    public JsonNode changeStatus(UUID orderId, String status, String changedBy) {
+    /** {@code comment} — optional words for the client, the app shows them under the status. */
+    public JsonNode changeStatus(UUID orderId, String status, String changedBy, String comment) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", status);
         body.put("changed_by", changedBy);
+        body.put("comment", comment);
         return send(() -> restClient.post().uri("/internal/orders/{id}/status", orderId).contentType(MediaType.APPLICATION_JSON)
                 .body(body).retrieve().body(String.class));
     }

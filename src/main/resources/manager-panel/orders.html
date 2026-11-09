@@ -24,6 +24,8 @@
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   button.danger { color:var(--danger); }
   button:disabled { opacity:.5; cursor:default; }
+  textarea { font:inherit; width:100%; box-sizing:border-box; margin-top:8px; padding:4px 6px; border-radius:6px; border:1px solid var(--line);
+    background:var(--bg); color:var(--fg); resize:vertical; }
   .delivery { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; align-items:center; }
   input { font:inherit; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); width:110px; }
   .error { color:var(--danger); margin-top:6px; }
@@ -35,8 +37,10 @@
 <script>
 (function () {
   "use strict";
-  var LABELS = { pending: "Ожидает", processing: "Собираем заказ", shipped: "Передано в доставку", delivered: "Получен", cancelled: "Отменён" };
-  var ACTIONS = { processing: "Собираем", shipped: "Передано в доставку", delivered: "Получен", cancelled: "Отменить" };
+  var LABELS = { pending: "Принят", invoiced: "Ждёт оплаты", processing: "Собираем заказ", shipped: "Передано в доставку",
+    delivered: "Получен", cancelled: "Отменён" };
+  var ACTIONS = { invoiced: "Выставить счёт", processing: "Оплачен", shipped: "Передано в доставку", delivered: "Получен",
+    cancelled: "Отменить" };
   var key = new URLSearchParams(location.search).get("key") || "";
   var list = document.getElementById("list");
   var ctx = null;
@@ -104,12 +108,16 @@
     var error = el("div", "error");
 
     if (o.next_statuses && o.next_statuses.length) {
+      var comment = el("textarea"); comment.rows = 2; comment.maxLength = 1000;
+      comment.placeholder = "Комментарий клиенту к новому статусу (необязательно) — покажется в приложении";
+      box.appendChild(comment);
       var actions = el("div", "actions");
       o.next_statuses.forEach(function (s) {
         var b = el("button", s === "cancelled" ? "danger" : "primary", ACTIONS[s] || LABELS[s] || s);
         b.onclick = function () {
           if (s === "cancelled" && !confirm("Отменить заказ № " + o.number + "?")) return;
-          act(box, error, api("POST", "/orders/" + o.id + "/status", Object.assign({ status: s }, common())));
+          act(box, error, api("POST", "/orders/" + o.id + "/status",
+            Object.assign({ status: s, comment: comment.value.trim() || null }, common())));
         };
         actions.appendChild(b);
       });

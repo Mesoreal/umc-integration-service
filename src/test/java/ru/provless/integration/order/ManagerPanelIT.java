@@ -72,27 +72,28 @@ class ManagerPanelIT extends ChatConnectorTestBase {
     @Test
     void list_status_delivery_throughCatalog_notedInTheConversation() throws Exception {
         chatwoot.stubFor(get(urlPathEqualTo("/internal/orders")).withQueryParam("user_id", equalTo(user.toString()))
-                .willReturn(okJson("[{\"id\":\"" + order + "\",\"number\":1001,\"status\":\"pending\",\"next_statuses\":[\"processing\",\"cancelled\"]}]")));
+                .willReturn(okJson("[{\"id\":\"" + order + "\",\"number\":1001,\"status\":\"pending\",\"next_statuses\":[\"invoiced\",\"cancelled\"]}]")));
         chatwoot.stubFor(post("/internal/orders/" + order + "/status")
-                .willReturn(okJson("{\"id\":\"" + order + "\",\"number\":1001,\"status\":\"processing\"}")));
+                .willReturn(okJson("{\"id\":\"" + order + "\",\"number\":1001,\"status\":\"invoiced\"}")));
         chatwoot.stubFor(put("/internal/orders/" + order + "/delivery")
                 .willReturn(okJson("{\"id\":\"" + order + "\",\"number\":1001,\"status\":\"processing\","
                         + "\"delivery_price\":{\"amount\":\"450.00\",\"currency\":\"RUB\"},\"delivery_date\":\"2026-11-05\"}")));
 
         api("GET", "/orders?user_id=" + user, null).andExpect(status().isOk()).andExpect(jsonPath("$[0].number").value(1001));
-        api("POST", "/orders/" + order + "/status", "{\"status\":\"processing\",\"agent_name\":\"Пётр\",\"conversation_id\":30}")
-                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("processing"));
+        api("POST", "/orders/" + order + "/status",
+                "{\"status\":\"invoiced\",\"comment\":\" Оплата до пятницы \",\"agent_name\":\"Пётр\",\"conversation_id\":30}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("invoiced"));
         api("PUT", "/orders/" + order + "/delivery",
                 "{\"delivery_price\":\"450\",\"delivery_date\":\"2026-11-05\",\"agent_name\":\"Пётр\",\"conversation_id\":30}")
                 .andExpect(status().isOk());
 
         chatwoot.verify(postRequestedFor(urlEqualTo("/internal/orders/" + order + "/status"))
-                .withRequestBody(equalToJson("{\"status\":\"processing\",\"changed_by\":\"Пётр\"}")));
+                .withRequestBody(equalToJson("{\"status\":\"invoiced\",\"changed_by\":\"Пётр\",\"comment\":\"Оплата до пятницы\"}")));
         chatwoot.verify(putRequestedFor(urlEqualTo("/internal/orders/" + order + "/delivery"))
                 .withRequestBody(equalToJson("{\"delivery_price\":\"450\",\"delivery_date\":\"2026-11-05\"}")));
         chatwoot.verify(postRequestedFor(urlEqualTo(ACCOUNT + "/conversations/30/messages"))
                 .withRequestBody(matchingJsonPath("$.private", equalTo("true")))
-                .withRequestBody(containing("Пётр: заказ № 1001 → Собираем заказ")));
+                .withRequestBody(containing("Пётр: заказ № 1001 → Ждёт оплаты\\nКлиенту: Оплата до пятницы")));
         chatwoot.verify(postRequestedFor(urlEqualTo(ACCOUNT + "/conversations/30/messages"))
                 .withRequestBody(containing("Пётр: заказ № 1001 — доставка 450,00 ₽, 05.11.2026")));
     }

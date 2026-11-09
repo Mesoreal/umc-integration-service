@@ -59,7 +59,7 @@ class OrderCopyIT extends ChatConnectorTestBase {
         await(() -> chatwoot.verify(postRequestedFor(urlEqualTo("/directus/items/orders"))
                 .withHeader("Authorization", equalTo("Bearer svc-token"))
                 .withRequestBody(equalToJson("""
-                        {"id":"%s","number":1001,"placed_at":"2026-11-03T10:15:00Z","status":"Ожидает","buyer_name":"Иванова Анна",
+                        {"id":"%s","number":1001,"placed_at":"2026-11-03T10:15:00Z","status":"Принят","buyer_name":"Иванова Анна",
                          "buyer_phone":"+79990000001","organization":"ООО Клиника, ИНН 7701234567",
                          "delivery_address":"г. Москва, ул. Тверская, д. 10","items":"1. Крем (ART-2) — 2 шт × 2 350,00 = 4 700,00 ₽",
                          "total":"6590.00","delivery_price":null,"delivery_date":null,"comment":"Позвонить",
