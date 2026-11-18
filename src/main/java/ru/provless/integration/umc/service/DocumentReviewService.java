@@ -84,6 +84,7 @@ public class DocumentReviewService {
         review.setProfileId(request.getProfileId());
         review.setUserId(request.getUserId());
         review.setDocumentType(request.getDocumentType());
+        review.setProfileType(request.getProfileType());
         review.setStatus(DocumentReviewStatus.OCR_PROCESSING);
         return documentReviewRepository.save(review);
     }

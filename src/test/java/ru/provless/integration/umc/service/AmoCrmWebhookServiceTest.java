@@ -37,13 +37,15 @@ class AmoCrmWebhookServiceTest {
     private DocumentReviewRepository documentReviewRepository;
     @Mock
     private DocumentReviewAuditWriter auditWriter;
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private AmoCrmWebhookService service;
     private DocumentReview review;
 
     @BeforeEach
     void setUp() {
-        service = new AmoCrmWebhookService(documentReviewRepository, auditWriter);
+        service = new AmoCrmWebhookService(documentReviewRepository, auditWriter, eventPublisher);
         ReflectionTestUtils.setField(service, "stageApprovedIdRaw", String.valueOf(APPROVED_STAGE_ID));
         ReflectionTestUtils.setField(service, "stageRejectedIdRaw", String.valueOf(REJECTED_STAGE_ID));
 
@@ -65,6 +67,8 @@ class AmoCrmWebhookServiceTest {
         ArgumentCaptor<String> actorCaptor = ArgumentCaptor.forClass(String.class);
         verify(auditWriter).write(eq(review), eq(DocumentReviewAuditEventType.CRM_STATUS_CHANGED), any(), actorCaptor.capture());
         assertThat(actorCaptor.getValue()).isEqualTo("amocrm_user:42");
+        // the decision goes to profile-service after commit (AmoCrmDecisions)
+        verify(eventPublisher).publishEvent(new AmoCrmDecisions.Decided(review.getId()));
     }
 
     @Test

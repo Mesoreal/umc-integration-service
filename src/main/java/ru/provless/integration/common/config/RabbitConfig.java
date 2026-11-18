@@ -16,6 +16,8 @@ public class RabbitConfig {
 
     public static final String USER_LOGGED_IN_QUEUE = "auth.user-logged-in";
     public static final String PROFILE_CONTACTS_UPDATED_QUEUE = "profile.contacts-updated";
+    /** A LEGAL / IE payer to check (front requests S5 §10). */
+    public static final String PROFILE_PAYER_ADDED_QUEUE = "profile.payer-added";
     private static final String DLQ_SUFFIX = ".dlq";
 
     @Bean
@@ -36,6 +38,16 @@ public class RabbitConfig {
     @Bean
     public Queue profileContactsUpdatedDeadLetterQueue() {
         return QueueBuilder.durable(PROFILE_CONTACTS_UPDATED_QUEUE + DLQ_SUFFIX).build();
+    }
+
+    @Bean
+    public Queue profilePayerAddedQueue() {
+        return withDeadLetter(PROFILE_PAYER_ADDED_QUEUE);
+    }
+
+    @Bean
+    public Queue profilePayerAddedDeadLetterQueue() {
+        return QueueBuilder.durable(PROFILE_PAYER_ADDED_QUEUE + DLQ_SUFFIX).build();
     }
 
     /**

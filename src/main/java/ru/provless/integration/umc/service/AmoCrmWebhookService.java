@@ -22,8 +22,7 @@ import java.util.regex.Pattern;
 /**
  * Stage 8 of the plan: amoCRM's webhook when a deal's stage changes in the "Проверка
  * документов" pipeline. Only updates integration-service's own {@code document_review}
- * status — publishing {@code document.approved}/{@code document.rejected} to profile-service
- * is Phase 4, not this.
+ * status here; the decision goes to profile-service after commit ({@link AmoCrmDecisions}, front requests S5 §10).
  *
  * amoCRM's classic (Settings → Webhooks) callback has no built-in payload signature, so
  * authenticity here relies on a secret embedded in the callback URL path itself (see
@@ -48,6 +47,7 @@ public class AmoCrmWebhookService {
 
     private final DocumentReviewRepository documentReviewRepository;
     private final DocumentReviewAuditWriter auditWriter;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void handle(MultiValueMap<String, String> form) {
@@ -102,6 +102,8 @@ public class AmoCrmWebhookService {
         auditWriter.write(review, DocumentReviewAuditEventType.CRM_STATUS_CHANGED,
                 Map.of("statusId", change.statusId(), "newStatus", newStatus.name()), actor);
         log.info("DocumentReview {} moved to {} via amoCRM webhook (lead {})", review.getId(), newStatus, change.leadId());
+        // after commit: read the deal's reason / comment / summary and pass the decision to profile-service (AmoCrmDecisions)
+        eventPublisher.publishEvent(new AmoCrmDecisions.Decided(review.getId()));
     }
 
     /**

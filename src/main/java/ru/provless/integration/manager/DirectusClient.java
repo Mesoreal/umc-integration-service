@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -159,6 +160,26 @@ public class DirectusClient {
 
     public void updateGraduate(UUID id, Map<String, Object> fields) {
         send(restClient.patch().uri("/items/graduates/{id}", id), fields);
+    }
+
+    // ─── rejection reasons (front requests S5 §10) ──────────────────────────
+
+    /** A row of «Причины отклонения»: {@code appliesTo} — {@code document} and / or {@code payer}. */
+    public record ReasonRow(String code, String text, Set<String> appliesTo, boolean active, int sort) {
+    }
+
+    public List<ReasonRow> rejectionReasons() {
+        List<ReasonRow> rows = new ArrayList<>();
+        for (JsonNode r : get("/items/rejection_reasons?limit=-1&fields=code,text,applies_to,active,sort&sort=sort,id")) {
+            Set<String> applies = new java.util.LinkedHashSet<>();
+            r.path("applies_to").forEach(a -> applies.add(a.asText()));
+            String code = text(r, "code");
+            String text = text(r, "text");
+            if (code != null && text != null) {
+                rows.add(new ReasonRow(code, text, applies, r.path("active").asBoolean(true), r.path("sort").asInt(0)));
+            }
+        }
+        return rows;
     }
 
     // ─── HTTP ───────────────────────────────────────────────────────────────

@@ -11,4 +11,8 @@ public interface DocumentReviewRepository extends JpaRepository<DocumentReview, 
     Optional<DocumentReview> findByDocumentId(UUID documentId);
 
     Optional<DocumentReview> findByAmocrmLeadId(Long amocrmLeadId);
+
+    /** Decided in amoCRM, not yet taken by profile-service (front requests S5 §10). */
+    java.util.List<DocumentReview> findTop50ByStatusInAndDecisionSentAtIsNullAndAmocrmLeadIdIsNotNull(
+            java.util.Collection<ru.provless.integration.umc.entity.DocumentReviewStatus> statuses);
 }

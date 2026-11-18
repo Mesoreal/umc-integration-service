@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка документов</title>
+<!-- The panel tab «Проверка документов» (front requests S5 §10): the request of this conversation of the inbox «Проверка документов»
+     and the decision on it. Chatwoot sends the context by postMessage; the API is /manager-panel/api/** with the key of the address. -->
+<style>
+  :root { --bg:#fff; --fg:#1f2d3d; --muted:#6b7a8c; --line:#e3e8ef; --card:#f7f9fb; --accent:#1f93ff; --danger:#d93025; --ok:#1e8e3e; }
+  :root.dark { --bg:#151718; --fg:#e8eaed; --muted:#9aa4af; --line:#2c3033; --card:#1d2023; --accent:#3a9bff; --danger:#f28b82; --ok:#81c995; }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:12px; background:var(--bg); color:var(--fg); font:14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  h1 { font-size:15px; margin:0 0 10px; }
+  .muted { color:var(--muted); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .row { margin-top:8px; }
+  .ok { color:var(--ok); } .no { color:var(--danger); }
+  label { display:block; margin-top:8px; }
+  select, textarea, input { font:inherit; width:100%; margin-top:4px; padding:4px 6px; border-radius:6px; border:1px solid var(--line);
+    background:var(--bg); color:var(--fg); }
+  textarea { resize:vertical; }
+  .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  button { font:inherit; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.danger { color:var(--danger); }
+  button:disabled { opacity:.5; cursor:default; }
+  .error { color:var(--danger); margin-top:6px; }
+</style>
+</head>
+<body>
+<h1>Проверка документов</h1>
+<div id="box" class="muted">Загрузка…</div>
+<script>
+(function () {
+  "use strict";
+  var key = new URLSearchParams(location.search).get("key") || "";
+  var box = document.getElementById("box");
+  var ctx = null;
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function date(iso) { return new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+
+  function api(method, path, body) {
+    return fetch("/manager-panel/api" + path, {
+      method: method,
+      headers: { "X-Panel-Key": key, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var json = t ? JSON.parse(t) : null;
+        if (!r.ok) { var e = new Error((json && (json.message || json.error_code)) || ("Ошибка " + r.status)); e.code = json && json.error_code; throw e; }
+        return json;
+      });
+    });
+  }
+
+  function load() {
+    var id = ctx.conversation && ctx.conversation.id;
+    if (!id) { box.className = "muted"; box.textContent = "Откройте разговор."; return; }
+    api("GET", "/reviews?conversation_id=" + encodeURIComponent(id)).then(render).catch(function (e) {
+      box.className = e.code === "NO_REVIEW" ? "muted" : "error";
+      box.textContent = e.code === "NO_REVIEW" ? "В этом разговоре нет заявки на проверку." : "Не загрузилось: " + e.message;
+    });
+  }
+
+  function render(r) {
+    box.className = "card"; box.textContent = "";
+    box.appendChild(el("div", null, r.title + " — реквизиты и файлы в заметках разговора"));
+    if (r.status === "DECIDED") {
+      box.appendChild(el("div", "row " + (r.decision === "APPROVED" ? "ok" : "no"),
+        (r.decision === "APPROVED" ? "Одобрено" : "Отклонено") + " · " + (r.decided_by || "") + (r.decided_at ? " · " + date(r.decided_at) : "")));
+      return;
+    }
+    if (r.status === "CANCELLED") { box.appendChild(el("div", "row muted", "Клиент удалил заявку — решение не нужно.")); return; }
+    if (r.status === "QUEUED") { box.appendChild(el("div", "row muted", "Заявка ещё не готова — обновите через минуту.")); return; }
+
+    var error = el("div", "error");
+    var summary = null;
+    if (r.summary_allowed) {
+      var l = el("label", null, "Резюме диплома для клиента (при одобрении, необязательно)");
+      summary = el("input"); summary.maxLength = 500; summary.placeholder = "Иванова Анна Сергеевна · сестринское дело";
+      l.appendChild(summary); box.appendChild(l);
+    }
+    var lr = el("label", null, "Причина отклонения");
+    var reason = el("select");
+    reason.appendChild(el("option", null, "— выберите —")).value = "";
+    r.reasons.forEach(function (x) { var o = el("option", null, x.text); o.value = x.code; reason.appendChild(o); });
+    lr.appendChild(reason); box.appendChild(lr);
+    var lc = el("label", null, "Комментарий клиенту (обязателен для «Другая причина»)");
+    var comment = el("textarea"); comment.rows = 2; comment.maxLength = 1000;
+    lc.appendChild(comment); box.appendChild(lc);
+
+    var actions = el("div", "actions");
+    var approve = el("button", "primary", "Одобрить");
+    approve.onclick = function () {
+      act(error, { approved: true, summary: summary ? summary.value.trim() || null : null }, r.id);
+    };
+    var reject = el("button", "danger", "Отклонить");
+    reject.onclick = function () {
+      if (!reason.value) { error.textContent = "Выберите причину"; return; }
+      if (reason.value === "OTHER" && !comment.value.trim()) { error.textContent = "Напишите комментарий для «Другая причина»"; return; }
+      act(error, { approved: false, reason: reason.value, comment: comment.value.trim() || null }, r.id);
+    };
+    actions.appendChild(approve); actions.appendChild(reject);
+    box.appendChild(actions); box.appendChild(error);
+  }
+
+  function act(error, body, id) {
+    box.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+    error.textContent = "";
+    body.agent_name = ctx.currentAgent && ctx.currentAgent.name;
+    api("POST", "/reviews/" + id + "/decision", body).then(render).catch(function (e) {
+      error.textContent = e.message;
+      box.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+    });
+  }
+
+  window.addEventListener("message", function (event) {
+    var message;
+    try { message = typeof event.data === "string" ? JSON.parse(event.data) : event.data; } catch (e) { return; }
+    if (!message || message.event !== "appContext") return;
+    ctx = message.data || {};
+    document.documentElement.classList.toggle("dark", ctx.theme === "dark");
+    load();
+  });
+  window.parent.postMessage("chatwoot-dashboard-app:fetch-info", "*");
+})();
+</script>
+</body>
+</html>

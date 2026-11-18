@@ -19,6 +19,10 @@ import java.util.UUID;
 @Setter
 public class DocumentReview {
 
+    public boolean physical() {
+        return profileType == null || "PHYSICAL".equals(profileType);
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -55,6 +59,26 @@ public class DocumentReview {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "ocr_matched_keywords", columnDefinition = "jsonb")
     private List<String> ocrMatchedKeywords;
+
+    /** PHYSICAL → amoCRM, LEGAL → Chatwoot «Проверка документов» (front requests S5 §10); null — before §10, amoCRM. */
+    @Column(name = "profile_type", length = 20)
+    private String profileType;
+
+    /** The decision read from the amoCRM deal, kept until profile-service has it ({@code decisionSentAt}). */
+    @Column(name = "decision_reason_code", length = 50)
+    private String decisionReasonCode;
+
+    @Column(name = "decision_reason_text", length = 500)
+    private String decisionReasonText;
+
+    @Column(name = "decision_comment", length = 1000)
+    private String decisionComment;
+
+    @Column(name = "decision_summary", length = 500)
+    private String decisionSummary;
+
+    @Column(name = "decision_sent_at")
+    private OffsetDateTime decisionSentAt;
 
     @Column(name = "amocrm_lead_id")
     private Long amocrmLeadId;

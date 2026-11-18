@@ -23,4 +23,7 @@ public class PrecheckRequest {
 
     @NotNull
     private DocumentType documentType;
+
+    /** PHYSICAL / LEGAL — where the document is checked (§10); missing (an older profile-service) — PHYSICAL. */
+    private String profileType;
 }

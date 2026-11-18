@@ -117,6 +117,10 @@ class ManagerPanelIT extends ChatConnectorTestBase {
         chatwoot.verify(postRequestedFor(urlEqualTo(ACCOUNT + "/dashboard_apps")).withRequestBody(equalToJson("""
                 {"dashboard_app":{"title":"Заказы клиента","content":[{"type":"frame",
                  "url":"https://app-test.mesoreal.ru/manager-panel/orders?key=panel-secret"}]}}""")));
+        // and the tab «Проверка документов» (front requests S5 §10) — the same panel, /reviews
+        chatwoot.verify(postRequestedFor(urlEqualTo(ACCOUNT + "/dashboard_apps")).withRequestBody(equalToJson("""
+                {"dashboard_app":{"title":"Проверка документов","content":[{"type":"frame",
+                 "url":"https://app-test.mesoreal.ru/manager-panel/reviews?key=panel-secret"}]}}""")));
 
         chatwoot.stubFor(get(ACCOUNT + "/dashboard_apps").willReturn(okJson(
                 "[{\"id\":3,\"title\":\"Заказы клиента\",\"content\":[{\"type\":\"frame\",\"url\":\"https://old/x?key=old\"}]}]")));

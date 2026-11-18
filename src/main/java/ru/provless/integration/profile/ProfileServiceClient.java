@@ -109,4 +109,76 @@ public class ProfileServiceClient {
             throw e;
         }
     }
+
+    // ─── checks of documents and payers (front requests S5 §10) ────────────
+
+    /** A decision for profile-service's internal API (snake_case there). {@code reason} null for an approval. */
+    public record Decision(boolean approved, String reason, String reasonText, String comment, String summary) {
+
+        public static Decision approve(String summary) {
+            return new Decision(true, null, null, null, summary);
+        }
+
+        public static Decision reject(String reason, String reasonText, String comment) {
+            return new Decision(false, reason, reasonText, comment, null);
+        }
+
+        java.util.Map<String, Object> body() {
+            java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+            body.put("approved", approved);
+            body.put("reason", reason);
+            body.put("reason_text", reasonText);
+            body.put("comment", comment);
+            body.put("summary", summary);
+            return body;
+        }
+    }
+
+    /** profile-service refused the decision: 404 — the document / payer is gone (deleted by the client), 400 — the decision itself. */
+    public static class DecisionRefused extends RuntimeException {
+        private final int status;
+
+        public DecisionRefused(int status, String message) {
+            super(message);
+            this.status = status;
+        }
+
+        public int status() {
+            return status;
+        }
+
+        public boolean gone() {
+            return status == 404;
+        }
+    }
+
+    public void decideDocument(UUID userId, UUID documentId, Decision decision) {
+        decide("/internal/profiles/{userId}/documents/{id}/decision", userId, documentId, decision);
+    }
+
+    public void decideOrganization(UUID userId, UUID organizationId, Decision decision) {
+        decide("/internal/profiles/{userId}/organizations/{id}/decision", userId, organizationId, decision);
+    }
+
+    private void decide(String uri, UUID userId, UUID id, Decision decision) {
+        try {
+            restClient.post().uri(uri, userId, id).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .body(decision.body()).retrieve().toBodilessEntity();
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            throw new DecisionRefused(e.getStatusCode().value(), e.getResponseBodyAsString());
+        }
+    }
+
+    /** The payer to check, with the client's DaData suggestion ({@code dadata}); empty when the client deleted it. */
+    public Optional<com.fasterxml.jackson.databind.JsonNode> findOrganization(UUID userId, UUID organizationId) {
+        try {
+            String body = restClient.get().uri("/internal/profiles/{userId}/organizations/{id}", userId, organizationId)
+                    .retrieve().body(String.class);
+            return Optional.of(jsonMapper.readTree(body));
+        } catch (HttpClientErrorException.NotFound e) {
+            return Optional.empty();
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
 }

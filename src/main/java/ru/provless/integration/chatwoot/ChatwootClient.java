@@ -305,6 +305,18 @@ public class ChatwootClient {
         return createMessage(conversationId, content, "outgoing", true, null, inReplyTo, List.of());
     }
 
+    /** A note with files (a request of «Проверка документов»: the licence, the document). */
+    public ChatwootMessageRef createPrivateNoteWithFiles(long conversationId, String content, List<ChatwootUpload> uploads) {
+        return createMessage(conversationId, content, "outgoing", true, null, null, uploads);
+    }
+
+    /** {@code open} / {@code resolved} / {@code pending}. */
+    public void setConversationStatus(long conversationId, String status) {
+        ObjectNode body = jsonMapper.createObjectNode();
+        body.put("status", status);
+        call(HttpMethod.POST, "/conversations/" + conversationId + "/toggle_status", body, false);
+    }
+
     /**
      * A copy of a message in another conversation (a transfer to a department): incoming, outgoing or a note, as the
      * original. {@code sourceId} marks it as the connector's, so its webhook is not taken for an agent's reply.

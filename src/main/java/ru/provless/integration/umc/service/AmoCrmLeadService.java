@@ -18,7 +18,8 @@ import java.util.Map;
 
 /**
  * Stage 6 of the plan: once precheck passes, create a deal in amoCRM's "Проверка
- * документов" pipeline (background task — see {@link DocumentPassedPrecheckEvent}).
+ * документов" pipeline (background task — see {@link DocumentPassedPrecheckEvent}) — only for documents of a person's profile
+ * (front requests S5 §10); an organization's go to Chatwoot.
  * Phase 2 scope: one-way sync only, no webhook yet — a manager reads the pipeline
  * manually. Failures here are logged and audited but not retried automatically; there is
  * no recovery path until Phase 3's webhook lands, so ops needs to notice a run of
@@ -45,6 +46,13 @@ public class AmoCrmLeadService {
             log.warn("DocumentReview {} disappeared before amoCRM lead creation", event.reviewId());
             return;
         }
+        if (!review.physical()) {
+            return; // an organization's document — Chatwoot «Проверка документов» (ReviewRouting)
+        }
+        if (!amoCrmClient.configured()) {
+            log.warn("amoCRM is not configured — documentReview {} gets no deal", review.getId());
+            return;
+        }
         if (review.getAmocrmLeadId() != null) {
             // precheck() re-running for a document that already has a lead (e.g. profile-service
             // retrying after a fail-open) must not create a second deal for it.
@@ -57,8 +65,8 @@ public class AmoCrmLeadService {
             long contactId = amoCrmClient.findOrCreateContact(contact.phone(), contact.fullName());
 
             String fileLink = publicBaseUrl + "/files/document-review/" + review.getId() + "/" + review.getFileAccessToken();
-            long leadId = amoCrmClient.createLead(new AmoCrmClient.CreateLeadRequest(
-                    contactId, review.getDocumentId(), review.getDocumentType().name(), fileLink, review.getOcrConfidence()));
+            long leadId = amoCrmClient.createLead(new AmoCrmClient.CreateLeadRequest(contactId, review.getDocumentId(),
+                    ru.provless.integration.review.DocumentLabels.of(review.getDocumentType()), fileLink, review.getOcrConfidence()));
 
             review.setAmocrmContactId(contactId);
             review.setAmocrmLeadId(leadId);

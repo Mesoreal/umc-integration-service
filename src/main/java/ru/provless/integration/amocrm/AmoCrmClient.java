@@ -7,13 +7,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -64,8 +64,10 @@ public class AmoCrmClient {
     @PostConstruct
     void init() {
         baseUrl = "https://" + subdomain + ".amocrm.ru";
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofMillis(connectTimeoutMs));
+        // java.net.http, not HttpURLConnection: the latter can't send PATCH (the reason list field)
+        org.springframework.http.client.JdkClientHttpRequestFactory factory = new org.springframework.http.client.JdkClientHttpRequestFactory(
+                java.net.http.HttpClient.newBuilder().version(java.net.http.HttpClient.Version.HTTP_1_1)
+                        .connectTimeout(Duration.ofMillis(connectTimeoutMs)).build());
         factory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
         restClient = RestClient.builder()
                 .requestFactory(factory)
@@ -93,7 +95,7 @@ public class AmoCrmClient {
         addTextField(customFields, fieldDocumentTypeId(), request.documentTypeLabel());
         addTextField(customFields, fieldDocumentIdId(), request.documentId().toString());
         addTextField(customFields, fieldFileLinkId(), request.fileLink());
-        if (request.ocrConfidence() != null) {
+        if (request.ocrConfidence() != null && !fieldOcrConfidenceIdRaw.isBlank()) {
             addNumberField(customFields, fieldOcrConfidenceId(), request.ocrConfidence());
         }
 
@@ -103,6 +105,80 @@ public class AmoCrmClient {
             throw new AmoCrmException("amoCRM lead creation returned no lead: " + response, null);
         }
         return leads.get(0).path("id").asLong();
+    }
+
+    // ─── the decision (front requests S5 §10) ───────────────────────────────
+
+    /** Everything needed to create deals and read decisions is set (subdomain, OAuth, pipeline, fields). */
+    public boolean configured() {
+        return !subdomain.isBlank() && !clientId.isBlank() && !clientSecret.isBlank() && !pipelineIdRaw.isBlank()
+                && !fieldDocumentTypeIdRaw.isBlank() && !fieldDocumentIdIdRaw.isBlank() && !fieldFileLinkIdRaw.isBlank();
+    }
+
+    /** The manager's decision fields of a deal: the reason as the list shows it, the comment, the diploma's summary. */
+    public record LeadDecision(String reasonText, String comment, String summary) {
+    }
+
+    public LeadDecision leadDecision(long leadId) {
+        JsonNode lead = get("/api/v4/leads/" + leadId);
+        if (lead == null) {
+            throw new AmoCrmException("amoCRM lead " + leadId + " not found", null);
+        }
+        return new LeadDecision(fieldValue(lead, fieldReasonIdRaw), fieldValue(lead, fieldCommentIdRaw), fieldValue(lead, fieldSummaryIdRaw));
+    }
+
+    private static String fieldValue(JsonNode lead, String fieldIdRaw) {
+        if (fieldIdRaw == null || fieldIdRaw.isBlank()) {
+            return null;
+        }
+        long fieldId = Long.parseLong(fieldIdRaw);
+        for (JsonNode field : lead.path("custom_fields_values")) {
+            if (field.path("field_id").asLong() == fieldId) {
+                JsonNode value = field.path("values").path(0).path("value");
+                return value.isMissingNode() || value.isNull() || value.asText().isBlank() ? null : value.asText().trim();
+            }
+        }
+        return null;
+    }
+
+    /** The list field «Причина отклонения» is set (its values are kept in step with Directus). */
+    public boolean reasonFieldConfigured() {
+        return configured() && fieldReasonIdRaw != null && !fieldReasonIdRaw.isBlank();
+    }
+
+    /**
+     * Makes the values of the list field «Причина отклонения» exactly {@code texts}, in this order: a value already there keeps its
+     * id (deals that have it keep it), a missing one is added, one not in the list any more is removed. Nothing changed — no call.
+     *
+     * @return true when the field was changed
+     */
+    public boolean syncReasonValues(List<String> texts) {
+        String path = "/api/v4/leads/custom_fields/" + Long.parseLong(fieldReasonIdRaw);
+        JsonNode field = get(path);
+        if (field == null) {
+            throw new AmoCrmException("amoCRM field «Причина отклонения» " + fieldReasonIdRaw + " not found", null);
+        }
+        java.util.Map<String, Long> existing = new java.util.LinkedHashMap<>();
+        for (JsonNode e : field.path("enums")) {
+            existing.put(e.path("value").asText(), e.path("id").asLong());
+        }
+        if (new ArrayList<>(existing.keySet()).equals(texts)) {
+            return false;
+        }
+        ObjectNode body = jsonMapper.createObjectNode();
+        ArrayNode enums = body.putArray("enums");
+        int sort = 1;
+        for (String text : texts) {
+            ObjectNode e = enums.addObject();
+            Long id = existing.get(text);
+            if (id != null) {
+                e.put("id", id);
+            }
+            e.put("value", text);
+            e.put("sort", sort++);
+        }
+        patch(path, body);
+        return true;
     }
 
     private Long searchContactByPhone(String phone) {
@@ -189,6 +265,22 @@ public class AmoCrmClient {
         }
     }
 
+    private JsonNode patch(String path, JsonNode body) {
+        try {
+            String responseBody = restClient.patch()
+                    .uri(baseUrl + path)
+                    .header("Authorization", "Bearer " + accessToken())
+                    .body(body)
+                    .retrieve()
+                    .body(String.class);
+            return responseBody == null || responseBody.isBlank() ? jsonMapper.createObjectNode() : jsonMapper.readTree(responseBody);
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            throw new AmoCrmException("amoCRM PATCH " + path + " failed: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+        } catch (Exception e) {
+            throw new AmoCrmException("amoCRM PATCH " + path + " failed", e);
+        }
+    }
+
     String accessToken() {
         AmoCrmToken token = tokenRepository.findById((short) 1)
                 .orElseGet(() -> seedToken());
@@ -261,6 +353,18 @@ public class AmoCrmClient {
 
     @Value("${amocrm.field-ocr-confidence-id}")
     private String fieldOcrConfidenceIdRaw;
+
+    /** «Причина отклонения» — a list; its values integration-service keeps equal to Directus (document reasons + «Другая причина»). */
+    @Value("${amocrm.field-reason-id:}")
+    private String fieldReasonIdRaw;
+
+    /** «Комментарий» — text: added to the reason for the client; required with «Другая причина». */
+    @Value("${amocrm.field-comment-id:}")
+    private String fieldCommentIdRaw;
+
+    /** «Резюме диплома» — text: the diploma in one line for the client's status screen, with an approval. */
+    @Value("${amocrm.field-summary-id:}")
+    private String fieldSummaryIdRaw;
 
     private long fieldDocumentTypeId() {
         return Long.parseLong(fieldDocumentTypeIdRaw);

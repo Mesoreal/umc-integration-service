@@ -73,30 +73,28 @@ yandex:
 integration:
   public-base-url: ${INTEGRATION_PUBLIC_BASE_URL:http://localhost:8091}
 
-# amoCRM (Фаза 2: создание сделки; Фаза 3: приём вебхука о смене этапа).
-#
-# Ниже — не учётные данные, а настройки конкретного амоCRM-аккаунта (поддомен, id
-# воронки/этапов/полей). Один аккаунт на весь бизнес, значения не различаются между
-# test/prod — поэтому заданы прямо здесь, а не через k8s Secret. Проставляются один
-# раз после настройки воронки «Проверка документов» в интерфейсе amoCRM,
-# см. umc/document-verification-plan.md "amoCRM". До этого момента — пустые, вебхук/лиды
-# создаваться не будут (клиенты AmoCrmClient должны считать это "не настроено").
+# amoCRM — проверка документов физлица в УМЦ (front requests S5 §10): сделка в воронке «Проверка документов» после precheck,
+# вебхук смены этапа → решение в profile-service. Не секреты, а настройки аккаунта: ConfigMap mesoreal-config (AMOCRM_*), на test —
+# своя воронка в том же аккаунте. Пусто — amoCRM не настроен: сделки не создаются (AmoCrmClient.configured()). Как настроить
+# воронку и поля — mesoreal-k8s readme, «amoCRM».
 amocrm:
-  subdomain: ""
-  # OAuth client id — публичный идентификатор интеграции, не секрет (в отличие от
-  # client-secret ниже). Выдаётся amoCRM при регистрации интеграции.
-  client-id: ""
-  redirect-uri: ""
-  pipeline-id: ""
-  stage-approved-id: ""
-  stage-rejected-id: ""
-  # Comma-separated allowlist. Пусто = выключено (amoCRM не публикует фиксированный
-  # список исходящих IP — заполним, когда увидим реальный трафик от вебхука).
-  webhook-ip-allowlist: ""
-  field-document-type-id: ""
-  field-document-id-id: ""
-  field-file-link-id: ""
-  field-ocr-confidence-id: ""
+  subdomain: ${AMOCRM_SUBDOMAIN:}
+  # OAuth client id — публичный идентификатор интеграции, не секрет (в отличие от client-secret ниже).
+  client-id: ${AMOCRM_CLIENT_ID:}
+  redirect-uri: ${AMOCRM_REDIRECT_URI:}
+  pipeline-id: ${AMOCRM_PIPELINE_ID:}
+  stage-approved-id: ${AMOCRM_STAGE_APPROVED_ID:}
+  stage-rejected-id: ${AMOCRM_STAGE_REJECTED_ID:}
+  # Comma-separated allowlist. Пусто = выключено (amoCRM не публикует фиксированный список исходящих IP).
+  webhook-ip-allowlist: ${AMOCRM_WEBHOOK_IP_ALLOWLIST:}
+  field-document-type-id: ${AMOCRM_FIELD_DOCUMENT_TYPE_ID:}
+  field-document-id-id: ${AMOCRM_FIELD_DOCUMENT_ID_ID:}
+  field-file-link-id: ${AMOCRM_FIELD_FILE_LINK_ID:}
+  field-ocr-confidence-id: ${AMOCRM_FIELD_OCR_CONFIDENCE_ID:}
+  # Решение менеджера: «Причина отклонения» (список — значения сервис сам держит равными Directus), «Комментарий», «Резюме диплома».
+  field-reason-id: ${AMOCRM_FIELD_REASON_ID:}
+  field-comment-id: ${AMOCRM_FIELD_COMMENT_ID:}
+  field-summary-id: ${AMOCRM_FIELD_SUMMARY_ID:}
   connect-timeout-ms: 2000
   read-timeout-ms: 10000
 
@@ -106,6 +104,13 @@ amocrm:
   # Secret embedded in the webhook callback URL path itself (POST /webhooks/amocrm/documents/{secret}),
   # not a header — amoCRM's classic webhooks don't reliably sign their payload.
   webhook-secret: ${AMOCRM_WEBHOOK_SECRET:}
+
+# Проверка документов и плательщиков (front requests S5 §10): документы профиля организации и плательщики ООО / ИП — заявки в
+# inbox Chatwoot «Проверка документов» (отдел продаж), решение — вкладка панели. Причины отклонения — Directus «Причины отклонения».
+review:
+  inbox-name: ${REVIEW_INBOX_NAME:Проверка документов}
+  reasons-interval: PT5M
+  retry-interval: PT5M
 
 # Chatwoot (менеджерский чат): контакт приложения при регистрации — один телефон = один контакт,
 # приложение = ещё один канал контакта (inbox «Приложение»). План:
