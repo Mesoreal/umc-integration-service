@@ -13,7 +13,12 @@ public record ChatDepartments(List<Department> departments) {
         departments = departments == null ? List.of() : List.copyOf(departments);
     }
 
-    public record Department(String key, String label, String inboxName) {
+    /** {@code managerRole} — the line under a manager's name in the app chat when «Подпись в чате» in Directus is empty. */
+    public record Department(String key, String label, String inboxName, String managerRole) {
+    }
+
+    public Optional<Department> byInboxName(String inboxName) {
+        return departments.stream().filter(d -> d.inboxName().equals(inboxName)).findFirst();
     }
 
     public Optional<Department> byKey(String key) {

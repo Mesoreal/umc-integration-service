@@ -70,7 +70,8 @@ public final class InboundEvents {
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record Manager(String id, String name, String avatarUrl, boolean isPersonal, String status, Instant lastSeenAt) {
+    public record Manager(String id, String name, String avatarUrl, boolean isPersonal, String status, Instant lastSeenAt,
+                          String role) {
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)

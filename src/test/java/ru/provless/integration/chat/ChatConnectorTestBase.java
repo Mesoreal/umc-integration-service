@@ -49,9 +49,11 @@ import static org.assertj.core.api.Assertions.assertThat;
         "chatwoot.chat.departments[0].key=sales",
         "chatwoot.chat.departments[0].label=в-продажи",
         "chatwoot.chat.departments[0].inbox-name=Приложение — продажи",
+        "chatwoot.chat.departments[0].manager-role=Менеджер по закупкам",
         "chatwoot.chat.departments[1].key=umc",
         "chatwoot.chat.departments[1].label=в-умц",
         "chatwoot.chat.departments[1].inbox-name=Приложение — УМЦ",
+        "chatwoot.chat.departments[1].manager-role=Менеджер учебного центра",
         "chatwoot.chat-storage.access-key=k",
         "chatwoot.chat-storage.secret-key=s",
         "chatwoot.chat-storage.bucket=" + ChatConnectorTestBase.BUCKET

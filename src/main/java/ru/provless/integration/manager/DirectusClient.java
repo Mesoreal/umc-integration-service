@@ -71,11 +71,13 @@ public class DirectusClient {
 
     // ─── «Менеджеры» ────────────────────────────────────────────────────────
 
-    public Map<Long, DirectusManager> managers() {
-        Map<Long, DirectusManager> managers = new LinkedHashMap<>();
-        for (JsonNode m : get("/items/managers?limit=-1&fields=id,name,email,departments,active,avatar_url")) {
-            managers.put(m.path("id").asLong(), new DirectusManager(m.path("id").asLong(), text(m, "name"), text(m, "email"),
-                    text(m, "departments"), m.path("active").asBoolean(false), text(m, "avatar_url")));
+    /** With «Подпись в чате» ({@code chat_role}) — the administration's, never written by the service. */
+    public Map<Long, ManagerRow> managers() {
+        Map<Long, ManagerRow> managers = new LinkedHashMap<>();
+        for (JsonNode m : get("/items/managers?limit=-1&fields=id,name,email,departments,active,avatar_url,chat_role")) {
+            managers.put(m.path("id").asLong(), new ManagerRow(new DirectusManager(m.path("id").asLong(), text(m, "name"),
+                    text(m, "email"), text(m, "departments"), m.path("active").asBoolean(false), text(m, "avatar_url")),
+                    text(m, "chat_role")));
         }
         return managers;
     }
@@ -220,6 +222,10 @@ public class DirectusClient {
     }
 
     public record DirectusManager(long id, String name, String email, String departments, boolean active, String avatarUrl) {
+    }
+
+    /** A row of «Менеджеры»: the service's fields and «Подпись в чате» (null — empty). */
+    public record ManagerRow(DirectusManager manager, String chatRole) {
     }
 
     /** A Directus user who created or changed a row. */

@@ -136,9 +136,11 @@ chatwoot:
       - key: sales
         label: для-продаж
         inbox-name: Продажи - Приложение
+        manager-role: Менеджер по закупкам
       - key: umc
         label: для-умц
         inbox-name: УМЦ - Приложение
+        manager-role: Менеджер учебного центра
     # Where Chatwoot sends the app inbox's webhook. Inside the cluster: Chatwoot already reaches in-cluster Services
     # (SAFE_FETCH_ALLOW_PRIVATE_NETWORK=true for the bridges); the path is not published by Traefik.
     webhook-url: ${CHATWOOT_CHAT_WEBHOOK_URL:http://integration-service:8080/webhooks/chatwoot/app}

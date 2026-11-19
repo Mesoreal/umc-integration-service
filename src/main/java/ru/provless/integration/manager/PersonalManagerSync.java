@@ -15,6 +15,9 @@ import ru.provless.integration.chatwoot.ChatwootInboxMember;
 import ru.provless.integration.manager.DirectusClient.ClientManagerRow;
 import ru.provless.integration.manager.DirectusClient.DirectusManager;
 import ru.provless.integration.manager.DirectusClient.Editor;
+import ru.provless.integration.manager.DirectusClient.ManagerRow;
+import ru.provless.integration.chat.ChatAgent;
+import ru.provless.integration.chat.ChatAgentRepository;
 import ru.provless.integration.profile.ContactInfo;
 import ru.provless.integration.profile.ProfileServiceClient;
 
@@ -62,6 +65,7 @@ public class PersonalManagerSync {
     private final TransactionTemplate tx;
     private final ChatHeader header;
     private final AppContactLinkRepository contacts;
+    private final ChatAgentRepository agents;
     private final boolean chatwootEnabled;
     private final String serviceEmail;
     private final Clock clock = Clock.systemUTC();
@@ -71,6 +75,7 @@ public class PersonalManagerSync {
                                ChatDepartments departments, AuthServiceClient auth, ProfileServiceClient profiles,
                                PersonalManagerRepository assignments, PersonalManagerHistoryRepository history,
                                TransactionTemplate tx, ChatHeader header, AppContactLinkRepository contacts,
+                               ChatAgentRepository agents,
                                @Value("${chatwoot.enabled:false}") boolean chatwootEnabled,
                                @Value("${directus.service-email}") String serviceEmail) {
         this.directus = directus;
@@ -84,6 +89,7 @@ public class PersonalManagerSync {
         this.tx = tx;
         this.header = header;
         this.contacts = contacts;
+        this.agents = agents;
         this.chatwootEnabled = chatwootEnabled;
         this.serviceEmail = serviceEmail;
     }
@@ -98,9 +104,13 @@ public class PersonalManagerSync {
         }
         try {
             Map<Long, DirectusManager> wanted = agentsOfDepartments();
-            Map<Long, DirectusManager> known = directus.managers();
+            Map<Long, ManagerRow> rows = directus.managers();
+            Map<Long, DirectusManager> known = new LinkedHashMap<>();
+            rows.forEach((id, row) -> known.put(id, row.manager()));
             log.debug("Managers sync: {} agents in the department inboxes, {} in Directus", wanted.size(), known.size());
             for (DirectusManager manager : wanted.values()) {
+                ManagerRow row = rows.get(manager.id());
+                role(manager, row == null ? null : row.chatRole());
                 DirectusManager was = known.get(manager.id());
                 if (was == null) {
                     directus.createManager(manager);
@@ -121,6 +131,32 @@ public class PersonalManagerSync {
         } catch (RuntimeException e) {
             log.warn("Managers sync failed: {}", e.getMessage());
         }
+    }
+
+    /**
+     * The line under the name in the app chat: «Подпись в чате» from Directus; empty — the department's, when the agent is in one
+     * department only. A change goes to the chat headers that show the agent. A failure is logged, the next tick tries again.
+     */
+    private void role(DirectusManager manager, String chatRole) {
+        String role = chatRole != null && !chatRole.isBlank() ? chatRole.strip() : departmentRole(manager.departments());
+        try {
+            String was = agents.findById(manager.id()).map(ChatAgent::getRole).orElse(null);
+            if (Objects.equals(was, role)) {
+                return;
+            }
+            agents.setRole(manager.id(), role);
+            log.info("Manager {} '{}': chat role '{}'", manager.id(), manager.name(), role);
+            header.refreshAgent(manager.id());
+        } catch (RuntimeException e) {
+            log.warn("Chat role of manager {} not updated: {}", manager.id(), e.getMessage());
+        }
+    }
+
+    private String departmentRole(String inboxNames) {
+        List<String> roles = inboxNames == null ? List.of() : java.util.Arrays.stream(inboxNames.split(", "))
+                .map(departments::byInboxName).flatMap(java.util.Optional::stream).map(ChatDepartments.Department::managerRole)
+                .distinct().toList();
+        return roles.size() == 1 ? roles.get(0) : null;
     }
 
     /** Every agent of a department inbox; one in both — both departments. All inboxes are read before anything is written. */

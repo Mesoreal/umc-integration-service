@@ -35,6 +35,17 @@ public class ChatHeader {
         inbound.send(new InboundEvents.ManagerChanged(userId, manager(userId, assigneeId, name, presence)));
     }
 
+    /** Again from what is stored, for everyone who sees this agent in the header: the agent's role changed. */
+    public void refreshAgent(long agentId) {
+        java.util.Set<UUID> users = new java.util.LinkedHashSet<>(conversations.currentUsersOfAgent(agentId));
+        personalManagers.findByAgentId(agentId).forEach(pm -> {
+            if (pm.getUserId() != null) {
+                users.add(pm.getUserId());
+            }
+        });
+        users.forEach(this::refresh);
+    }
+
     /** Again from what is stored: the personal manager changed. */
     public void refresh(UUID userId) {
         Long assignee = conversations.findByUserIdAndCurrentTrue(userId).map(ChatConversation::getAssigneeId).orElse(null);
@@ -56,6 +67,7 @@ public class ChatHeader {
             presence = agent == null ? "offline" : agent.getAvailability();
         }
         return new InboundEvents.Manager(InboundEvents.managerId(agentId), name, agent == null ? null : agent.getAvatarUrl(),
-                isPersonal, presence, agent == null || agent.getLastSeenAt() == null ? null : agent.getLastSeenAt().toInstant());
+                isPersonal, presence, agent == null || agent.getLastSeenAt() == null ? null : agent.getLastSeenAt().toInstant(),
+                agent == null ? null : agent.getRole());
     }
 }

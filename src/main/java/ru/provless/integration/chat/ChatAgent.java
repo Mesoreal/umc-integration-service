@@ -36,6 +36,10 @@ public class ChatAgent {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
+    /** The line under the name in the app chat; only the managers sync writes it ({@link ChatAgentRepository#setRole}). */
+    @Column(insertable = false, updatable = false)
+    private String role;
+
     public ChatAgent(long agentId, String availability) {
         this.agentId = agentId;
         this.availability = availability;

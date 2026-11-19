@@ -111,7 +111,9 @@ class PersonalManagerSyncIT extends ChatConnectorTestBase {
         services.stubFor(get(urlPathEqualTo(ITEMS + "managers")).willReturn(okJson("""
                 {"data":[{"id":2,"name":"Петя","email":"petr@m.ru","departments":"Приложение — продажи","active":true,"avatar_url":null},
                          {"id":3,"name":"Семён","email":"sem@m.ru","departments":"Приложение — УМЦ","active":true,"avatar_url":null},
-                         {"id":4,"name":"Вера","email":"vera@m.ru","departments":"Приложение — УМЦ","active":true,"avatar_url":null}]}""")));
+                         {"id":4,"name":"Вера","email":"vera@m.ru","departments":"Приложение — УМЦ","active":true,"avatar_url":null,
+                          "chat_role":"Куратор курса"}]}""")));
+        jdbc.update("DELETE FROM chatwoot.chat_agent WHERE agent_id IN (1, 2, 4)");
 
         sync.syncManagers();
 
@@ -124,6 +126,12 @@ class PersonalManagerSyncIT extends ChatConnectorTestBase {
         services.verify(patchRequestedFor(urlEqualTo(ITEMS + "managers/3")).withRequestBody(equalToJson("""
                 {"name":"Семён","email":"sem@m.ru","departments":"Приложение — УМЦ","active":false,"avatar_url":null}""")));
         services.verify(0, patchRequestedFor(urlEqualTo(ITEMS + "managers/4")));
+        // the line under the name in the chat: «Подпись в чате», else the one department's; never written back to Directus
+        assertThat(jdbc.queryForList("SELECT agent_id, role FROM chatwoot.chat_agent WHERE agent_id IN (1, 2, 4) ORDER BY agent_id"))
+                .extracting(r -> r.get("agent_id") + "=" + r.get("role"))
+                .containsExactly("1=Менеджер по закупкам", "4=Куратор курса"); // 2 — both departments: no line, nothing to write
+        services.verify(0, patchRequestedFor(urlPathMatching(ITEMS + "managers/.*")).withRequestBody(
+                com.github.tomakehurst.wiremock.client.WireMock.containing("chat_role")));
     }
 
     @Test

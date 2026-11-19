@@ -20,6 +20,10 @@ public interface ChatConversationRepository extends JpaRepository<ChatConversati
     @Query("select c.userId from ChatConversation c where c.current and c.inboxId = :inboxId")
     List<UUID> currentUsersOfInbox(@Param("inboxId") long inboxId);
 
+    /** Users whose current request is with this agent: their chat header shows the agent. */
+    @Query("select c.userId from ChatConversation c where c.current and c.assigneeId = :agentId")
+    List<UUID> currentUsersOfAgent(@Param("agentId") long agentId);
+
     /** Only this column: the read poll must not overwrite status or assignee written meanwhile by the listeners. */
     @Modifying
     @Transactional
