@@ -29,4 +29,13 @@ class PayerNoteTest {
         assertThat(text).startsWith("Плательщик на проверку: ИП").contains("Лицензия: ЛО-1")
                 .contains("DaData: нет — клиент ввёл реквизиты вручную").doesNotContain("КПП");
     }
+
+    @Test
+    void selfEmployed_theAppCouldNotCheckAtTheFns_theManagerIsToldWhereToCheck() throws Exception {
+        JsonNode payer = json.readTree("""
+                {"payer_type":"SELF_EMPLOYED","name":"Иванова Анна","inn":"500100732259","npd_check":"FNS_UNAVAILABLE"}""");
+        String text = PayerNote.of(payer, "Клиент: Иванова Анна, +79001234567");
+        assertThat(text).startsWith("Плательщик на проверку: самозанятый").contains("ИНН: 500100732259")
+                .contains("сервис ФНС не ответил").contains("npd.nalog.ru").doesNotContain("DaData");
+    }
 }

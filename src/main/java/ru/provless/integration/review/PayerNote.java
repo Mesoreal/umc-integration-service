@@ -20,8 +20,11 @@ final class PayerNote {
     }
 
     static String of(JsonNode payer, String client) {
-        boolean legal = "LEGAL".equals(payer.path("payer_type").asText());
-        StringBuilder text = new StringBuilder("Плательщик на проверку: ").append(legal ? "организация" : "ИП").append('\n')
+        String type = payer.path("payer_type").asText();
+        boolean legal = "LEGAL".equals(type);
+        boolean selfEmployed = "SELF_EMPLOYED".equals(type);
+        StringBuilder text = new StringBuilder("Плательщик на проверку: ")
+                .append(legal ? "организация" : selfEmployed ? "самозанятый" : "ИП").append('\n')
                 .append(client).append("\n\n");
         line(text, "Название", text(payer, "name"));
         line(text, "ИНН", text(payer, "inn"));
@@ -33,6 +36,13 @@ final class PayerNote {
         line(text, "Лицензия", text(payer, "license_number") == null ? null
                 : text(payer, "license_number") + (until == null ? "" : ", до " + LocalDate.parse(until).format(DAY)));
 
+        if (selfEmployed) {
+            // a self-employed reaches the manager only when the app could not check the INN at the FNS (24.11.2026)
+            text.append('\n').append(npd(text(payer, "npd_check")))
+                    .append("\nПроверьте статус: https://npd.nalog.ru/check-status/ (ИНН и дату).")
+                    .append("\n\nРешение — во вкладке «Проверка документов».");
+            return text.toString();
+        }
         JsonNode d = payer.path("dadata");
         text.append('\n');
         if (!d.isObject()) {
@@ -74,6 +84,13 @@ final class PayerNote {
             differs.add("адрес");
         }
         return differs;
+    }
+
+    private static String npd(String check) {
+        if ("FNS_UNAVAILABLE".equals(check)) {
+            return "ФНС (проверка в приложении): сервис ФНС не ответил — статус самозанятого не проверен.";
+        }
+        return "ФНС: приложение статус самозанятого не проверяло.";
     }
 
     private static String status(String s) {
