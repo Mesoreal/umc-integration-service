@@ -17,8 +17,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * amoCRM API v4 client (OAuth2 refresh-token flow + contacts/leads) for stage 6 of the
- * plan — creating a deal in the "Проверка документов" pipeline once precheck passes.
+ * amoCRM API v4 client (contacts/leads) for stage 6 of the plan — creating a deal in the "Проверка документов" pipeline once
+ * precheck passes.
+ *
+ * <p>Auth — the integration's <b>long-lived token</b> (25.11.2026, owner's decision of 26.10.2026; amoCRM «Ключи и доступы» →
+ * «Долгосрочный токен», its term chosen when issued): one {@code Authorization: Bearer}, nothing refreshed, nothing kept in the
+ * database. The OAuth2 refresh flow is gone (amoCRM rotated its refresh token on every use — a lost database or a race killed the
+ * integration). A 401 means the token expired or was revoked: a new one goes to {@code AMOCRM_LONG_LIVED_TOKEN}; its end date is
+ * read from the token and warned about 30 days ahead.
  *
  * NOTE: this has not been exercised against a real amoCRM account yet (real
  * AMOCRM_* values arrive separately from Yandex's). The OAuth2 token exchange and the
@@ -34,17 +40,8 @@ public class AmoCrmClient {
     @Value("${amocrm.subdomain}")
     private String subdomain;
 
-    @Value("${amocrm.client-id}")
-    private String clientId;
-
-    @Value("${amocrm.client-secret}")
-    private String clientSecret;
-
-    @Value("${amocrm.redirect-uri}")
-    private String redirectUri;
-
-    @Value("${amocrm.refresh-token}")
-    private String seedRefreshToken;
+    @Value("${amocrm.long-lived-token:}")
+    private String token;
 
     @Value("${amocrm.connect-timeout-ms:2000}")
     private int connectTimeoutMs;
@@ -52,14 +49,9 @@ public class AmoCrmClient {
     @Value("${amocrm.read-timeout-ms:10000}")
     private int readTimeoutMs;
 
-    private final AmoCrmTokenRepository tokenRepository;
     private final JsonMapper jsonMapper = JsonMapper.builder().build();
     private RestClient restClient;
     private String baseUrl;
-
-    public AmoCrmClient(AmoCrmTokenRepository tokenRepository) {
-        this.tokenRepository = tokenRepository;
-    }
 
     @PostConstruct
     void init() {
@@ -111,7 +103,7 @@ public class AmoCrmClient {
 
     /** Everything needed to create deals and read decisions is set (subdomain, OAuth, pipeline, fields). */
     public boolean configured() {
-        return !subdomain.isBlank() && !clientId.isBlank() && !clientSecret.isBlank() && !pipelineIdRaw.isBlank()
+        return !subdomain.isBlank() && !token.isBlank() && !pipelineIdRaw.isBlank()
                 && !fieldDocumentTypeIdRaw.isBlank() && !fieldDocumentIdIdRaw.isBlank() && !fieldFileLinkIdRaw.isBlank();
     }
 
@@ -225,7 +217,7 @@ public class AmoCrmClient {
         field.putArray("values").addObject().put("value", value);
     }
 
-    // ─── HTTP + OAuth2 ──────────────────────────────────────────────────────
+    // ─── HTTP ───────────────────────────────────────────────────────────────
 
     private JsonNode get(String path) {
         try {
@@ -241,7 +233,7 @@ public class AmoCrmClient {
         } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
             return null;
         } catch (org.springframework.web.client.HttpClientErrorException e) {
-            throw new AmoCrmException("amoCRM GET " + path + " failed: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+            throw failed("GET", path, e);
         } catch (AmoCrmException e) {
             throw e;
         } catch (Exception e) {
@@ -259,7 +251,7 @@ public class AmoCrmClient {
                     .body(String.class);
             return jsonMapper.readTree(responseBody);
         } catch (org.springframework.web.client.HttpClientErrorException e) {
-            throw new AmoCrmException("amoCRM POST " + path + " failed: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+            throw failed("POST", path, e);
         } catch (Exception e) {
             throw new AmoCrmException("amoCRM POST " + path + " failed", e);
         }
@@ -275,63 +267,53 @@ public class AmoCrmClient {
                     .body(String.class);
             return responseBody == null || responseBody.isBlank() ? jsonMapper.createObjectNode() : jsonMapper.readTree(responseBody);
         } catch (org.springframework.web.client.HttpClientErrorException e) {
-            throw new AmoCrmException("amoCRM PATCH " + path + " failed: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+            throw failed("PATCH", path, e);
         } catch (Exception e) {
             throw new AmoCrmException("amoCRM PATCH " + path + " failed", e);
         }
     }
 
     String accessToken() {
-        AmoCrmToken token = tokenRepository.findById((short) 1)
-                .orElseGet(() -> seedToken());
+        return token;
+    }
 
-        if (token.getAccessToken() != null && token.getExpiresAt() != null
-                && token.getExpiresAt().isAfter(OffsetDateTime.now().plusMinutes(1))) {
-            return token.getAccessToken();
+    /** 401 — the long-lived token expired or was revoked: a clear line for whoever reads the log, not a retry. */
+    private AmoCrmException failed(String verb, String path, org.springframework.web.client.HttpClientErrorException e) {
+        if (e.getStatusCode().value() == 401) {
+            log.error("amoCRM refused the long-lived token (401): it expired or was revoked — issue a new one in amoCRM «Ключи и доступы» "
+                    + "and put it to AMOCRM_LONG_LIVED_TOKEN (mesoreal-k8s readme 1.12)");
         }
-        return refresh(token);
+        return new AmoCrmException("amoCRM " + verb + " " + path + " failed: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
     }
 
-    private AmoCrmToken seedToken() {
-        AmoCrmToken token = new AmoCrmToken();
-        token.setRefreshToken(seedRefreshToken);
-        return tokenRepository.save(token);
+    /** At the start and every day: the token's end date (the {@code exp} of the JWT); 30 days before — a warning, after — an error. */
+    @org.springframework.scheduling.annotation.Scheduled(initialDelayString = "PT1M", fixedDelayString = "P1D")
+    void checkTokenTerm() {
+        java.time.Instant until = expiresAt(token);
+        if (until == null) {
+            return;
+        }
+        long days = java.time.Duration.between(java.time.Instant.now(), until).toDays();
+        if (days < 0) {
+            log.error("amoCRM long-lived token expired on {} — issue a new one (mesoreal-k8s readme 1.12)", until);
+        } else if (days <= 30) {
+            log.warn("amoCRM long-lived token expires on {} ({} days left) — issue a new one (mesoreal-k8s readme 1.12)", until, days);
+        } else {
+            log.info("amoCRM long-lived token valid until {}", until);
+        }
     }
 
-    private String refresh(AmoCrmToken token) {
-        ObjectNode body = jsonMapper.createObjectNode();
-        body.put("client_id", clientId);
-        body.put("client_secret", clientSecret);
-        body.put("grant_type", "refresh_token");
-        body.put("refresh_token", token.getRefreshToken());
-        body.put("redirect_uri", redirectUri);
-
+    /** The {@code exp} of a JWT; null when the token is not one or has no end. */
+    static java.time.Instant expiresAt(String jwt) {
+        if (jwt == null || jwt.chars().filter(c -> c == '.').count() != 2) {
+            return null;
+        }
         try {
-            String responseBody = restClient.post()
-                    .uri(baseUrl + "/oauth2/access_token")
-                    .body(body)
-                    .retrieve()
-                    .body(String.class);
-            JsonNode json = jsonMapper.readTree(responseBody);
-
-            String newAccessToken = json.path("access_token").asText(null);
-            String newRefreshToken = json.path("refresh_token").asText(null);
-            int expiresIn = json.path("expires_in").asInt(0);
-            if (newAccessToken == null || newRefreshToken == null) {
-                throw new AmoCrmException("amoCRM token refresh returned no tokens: " + responseBody, null);
-            }
-
-            token.setAccessToken(newAccessToken);
-            // amoCRM invalidates the old refresh_token as soon as it's used — persist the
-            // new one immediately, or the *next* refresh will fail with an already-dead token.
-            token.setRefreshToken(newRefreshToken);
-            token.setExpiresAt(OffsetDateTime.now().plusSeconds(expiresIn));
-            tokenRepository.save(token);
-            return newAccessToken;
-        } catch (AmoCrmException e) {
-            throw e;
+            String payload = new String(java.util.Base64.getUrlDecoder().decode(jwt.split("\\.")[1]), java.nio.charset.StandardCharsets.UTF_8);
+            JsonNode exp = JsonMapper.builder().build().readTree(payload).path("exp");
+            return exp.isNumber() ? java.time.Instant.ofEpochSecond(exp.asLong()) : null;
         } catch (Exception e) {
-            throw new AmoCrmException("Failed to refresh amoCRM OAuth2 token", e);
+            return null;
         }
     }
 

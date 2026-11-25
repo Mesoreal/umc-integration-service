@@ -79,9 +79,6 @@ integration:
 # воронку и поля — mesoreal-k8s readme, «amoCRM».
 amocrm:
   subdomain: ${AMOCRM_SUBDOMAIN:}
-  # OAuth client id — публичный идентификатор интеграции, не секрет (в отличие от client-secret ниже).
-  client-id: ${AMOCRM_CLIENT_ID:}
-  redirect-uri: ${AMOCRM_REDIRECT_URI:}
   pipeline-id: ${AMOCRM_PIPELINE_ID:}
   stage-approved-id: ${AMOCRM_STAGE_APPROVED_ID:}
   stage-rejected-id: ${AMOCRM_STAGE_REJECTED_ID:}
@@ -99,8 +96,8 @@ amocrm:
   read-timeout-ms: 10000
 
   # Настоящие секреты — только из mesoreal-secrets (k8s Secret), никогда не хардкодим.
-  client-secret: ${AMOCRM_CLIENT_SECRET:}
-  refresh-token: ${AMOCRM_REFRESH_TOKEN:}
+  # Долгосрочный токен интеграции (amoCRM «Ключи и доступы», срок — при выпуске; 25.11.2026 вместо OAuth refresh-токена).
+  long-lived-token: ${AMOCRM_LONG_LIVED_TOKEN:}
   # Secret embedded in the webhook callback URL path itself (POST /webhooks/amocrm/documents/{secret}),
   # not a header — amoCRM's classic webhooks don't reliably sign their payload.
   webhook-secret: ${AMOCRM_WEBHOOK_SECRET:}

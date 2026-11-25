@@ -1,0 +1,17 @@
+# Prod (SPRING_PROFILES_ACTIVE=prod in mesoreal-k8s apps/integration-service/overlays/prod, 25.11.2026): what must be set, or the
+# service does not start — instead of a silent default from git. The integrations that may stay empty (amoCRM, Chatwoot, OCR,
+# the site, the manager panel) keep their «empty — switched off» as designed.
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:?SPRING_DATASOURCE_URL is required in prod}
+    username: ${SPRING_DATASOURCE_USERNAME:?SPRING_DATASOURCE_USERNAME is required in prod}
+    password: ${SPRING_DATASOURCE_PASSWORD:?SPRING_DATASOURCE_PASSWORD is required in prod}
+  rabbitmq:
+    username: ${SPRING_RABBITMQ_USERNAME:?SPRING_RABBITMQ_USERNAME is required in prod}
+    password: ${SPRING_RABBITMQ_PASSWORD:?SPRING_RABBITMQ_PASSWORD is required in prod}
+
+# the internal API key — no «dev-internal-api-key-change-me» in prod
+internal:
+  api-key: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required in prod}
+profile-service:
+  internal-api-key: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required in prod}
