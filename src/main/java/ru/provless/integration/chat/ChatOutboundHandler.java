@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import ru.provless.integration.chatwoot.ChatwootClient;
 import ru.provless.integration.order.OrderRouting;
+import ru.provless.integration.chatwoot.ChatwootException;
 import ru.provless.integration.chatwoot.ChatwootUpload;
 
 import java.time.Instant;
@@ -72,16 +73,66 @@ public class ChatOutboundHandler {
             }
         }
         Long inReplyTo = quoted(event.replyToExternalId(), conversation.getConversationId());
+        String text = event.order() == null ? event.text() : orderText(event.order());
+        List<OutboundEvent.File> files = event.attachments() == null ? List.of() : event.attachments();
+        // Chatwoot takes attachments up to 40 MB; bigger ones (contract §14.9a, up to 4 GB) go as a line with a link
+        List<OutboundEvent.File> big = files.stream().filter(f -> f.size() > CHATWOOT_ATTACHMENT_MAX_BYTES).toList();
         List<ChatwootUpload> uploads = new ArrayList<>();
-        for (OutboundEvent.File f : event.attachments() == null ? List.<OutboundEvent.File>of() : event.attachments()) {
-            uploads.add(new ChatwootUpload(f.name(), f.mimeType(), storage.read(f.bucket(), f.objectKey())));
+        for (OutboundEvent.File f : files) {
+            if (f.size() <= CHATWOOT_ATTACHMENT_MAX_BYTES) {
+                uploads.add(new ChatwootUpload(f.name(), f.mimeType(), storage.read(f.bucket(), f.objectKey())));
+            }
         }
-        ChatwootClient.ChatwootMessageRef created = chatwoot.createIncomingMessage(conversation.getConversationId(),
-                event.order() == null ? event.text() : orderText(event.order()), sourceId, inReplyTo, uploads);
+        ChatwootClient.ChatwootMessageRef created;
+        try {
+            created = chatwoot.createIncomingMessage(conversation.getConversationId(), withLinks(text, big), sourceId, inReplyTo,
+                    uploads);
+        } catch (ChatwootException e) {
+            if (uploads.isEmpty() || e.getHttpStatus() < 400 || e.getHttpStatus() >= 500) {
+                throw e;
+            }
+            // Chatwoot refused an attachment (type, size): the managers still get the message, every file as a link
+            log.warn("Chatwoot refused the attachments of message {} ({}): sent as links", event.messageId(), e.getHttpStatus());
+            created = chatwoot.createIncomingMessage(conversation.getConversationId(), withLinks(text, files), sourceId, inReplyTo,
+                    List.of());
+        }
         confirm(save(created.id(), created.createdAt(), event, conversation));
         routeOrder(event);
         log.info("Chat message {} of userId={} → Chatwoot {} (conversation {})", event.messageId(), event.userId(),
                 created.id(), conversation.getConversationId());
+    }
+
+    /** Chatwoot's own limit of an attachment ({@code Attachment} validation, v4). */
+    static final long CHATWOOT_ATTACHMENT_MAX_BYTES = 40L * 1024 * 1024;
+
+    /** «📎 Договор.pdf · 1,2 ГБ: <link>» under the text, one line a file. */
+    static String withLinks(String text, List<OutboundEvent.File> files) {
+        if (files.isEmpty()) {
+            return text;
+        }
+        StringBuilder out = new StringBuilder(text == null || text.isBlank() ? "" : text + "\n\n");
+        for (OutboundEvent.File f : files) {
+            if (out.length() > 0 && out.charAt(out.length() - 1) != '\n') {
+                out.append('\n');
+            }
+            out.append("📎 ").append(f.name()).append(" · ").append(humanSize(f.size()));
+            out.append(f.link() == null ? " — файл в чате приложения, ссылка не настроена" : ": " + f.link());
+        }
+        return out.toString();
+    }
+
+    /** 820 КБ, 45,3 МБ, 1,2 ГБ. */
+    static String humanSize(long bytes) {
+        String[] units = {"Б", "КБ", "МБ", "ГБ"};
+        double value = bytes;
+        int unit = 0;
+        while (value >= 1024 && unit < units.length - 1) {
+            value /= 1024;
+            unit++;
+        }
+        String number = unit == 0 || value >= 100 ? String.valueOf(Math.round(value))
+                : String.format(java.util.Locale.ROOT, "%.1f", value).replace('.', ',').replace(",0", "");
+        return number + " " + units[unit];
     }
 
     /** A placed order: to sales, to the personal manager, with the order's note (once; a repeat finds it done). */

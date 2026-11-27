@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aMultipart;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalToJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
@@ -137,6 +138,47 @@ class ChatOutboundIT extends ChatConnectorTestBase {
                 """.formatted(UUID.randomUUID(), user, UUID.randomUUID(), UUID.randomUUID(), BUCKET, user));
 
         receiveUntil(ChatQueues.INBOUND, b -> b.contains("cw:310"), 10_000);
+    }
+
+    @Test
+    void aFileOverChatwootsLimit_goesAsALink_notDownloaded() {
+        stubNewConversation(15);
+        chatwoot.stubFor(post(ACCOUNT + "/conversations/15/messages")
+                .withRequestBody(matchingJsonPath("$.content", containing(
+                        "договор\n\n📎 Договор.pdf · 1,2 ГБ: https://app.example/api/v1/public/chat-files/f2?sig=abc")))
+                .willReturn(okJson("{\"id\":311,\"created_at\":1793480000}")));
+
+        // no object in the bucket: a big file is never read
+        outbound("""
+                {"type":"message.created","event_id":"%s","user_id":"%s","message_id":"%s","seq":1,"text":"договор",
+                 "attachments":[{"file_id":"%s","name":"Договор.pdf","mime_type":"application/pdf","size":1288490188,
+                                 "bucket":"%s","object_key":"app-chat/%s/f2",
+                                 "link":"https://app.example/api/v1/public/chat-files/f2?sig=abc"}],
+                 "reply_to_id":null,"reply_to_external_id":null,"created_at":"2026-10-31T10:00:00Z"}
+                """.formatted(UUID.randomUUID(), user, UUID.randomUUID(), UUID.randomUUID(), BUCKET, user));
+
+        receiveUntil(ChatQueues.INBOUND, b -> b.contains("cw:311"), 10_000);
+    }
+
+    @Test
+    void chatwootRefusesTheAttachment_theMessageGoesWithALink() {
+        stubNewConversation(15);
+        putFile("app-chat/" + user + "/f3", "%PDF-1.4".getBytes(StandardCharsets.UTF_8));
+        chatwoot.stubFor(post(ACCOUNT + "/conversations/15/messages")
+                .withMultipartRequestBody(aMultipart().withName("attachments[]"))
+                .willReturn(aResponse().withStatus(422).withBody("{\"error\":\"file type\"}")));
+        chatwoot.stubFor(post(ACCOUNT + "/conversations/15/messages")
+                .withRequestBody(matchingJsonPath("$.content", containing("📎 Счёт.pdf · 8 Б: https://app.example/l")))
+                .willReturn(okJson("{\"id\":312,\"created_at\":1793480000}")));
+
+        outbound("""
+                {"type":"message.created","event_id":"%s","user_id":"%s","message_id":"%s","seq":1,"text":null,
+                 "attachments":[{"file_id":"%s","name":"Счёт.pdf","mime_type":"application/pdf","size":8,
+                                 "bucket":"%s","object_key":"app-chat/%s/f3","link":"https://app.example/l"}],
+                 "reply_to_id":null,"reply_to_external_id":null,"created_at":"2026-10-31T10:00:00Z"}
+                """.formatted(UUID.randomUUID(), user, UUID.randomUUID(), UUID.randomUUID(), BUCKET, user));
+
+        receiveUntil(ChatQueues.INBOUND, b -> b.contains("cw:312"), 10_000);
     }
 
     @Test

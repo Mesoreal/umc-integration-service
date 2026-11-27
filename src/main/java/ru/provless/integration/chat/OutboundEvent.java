@@ -38,6 +38,7 @@ public record OutboundEvent(String type, UUID eventId, UUID userId,
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record File(UUID fileId, String name, String mimeType, long size, String bucket, String objectKey) {
+    /** {@code link} — chat-service's signed address of the file for the managers; null when it is not configured. */
+    public record File(UUID fileId, String name, String mimeType, long size, String bucket, String objectKey, String link) {
     }
 }
